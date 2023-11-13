@@ -1,6 +1,6 @@
 /*
  fa-capture under test
-   VERSION 00.02.0 
+   VERSION 00.02.0
 */
 
 #include "test_utils.h"
@@ -13,7 +13,7 @@
 #define ATTENDANCE_ALARM    0
 #define ATTENDANCE_MANUAL   0
 #define DUMP_PAYLOAD    	0
-#define IRQ_CNTRL_TEST      1
+#define IRQ_CNTRL_TEST      1       // not used
 #define CPU_CORE            1
 /******************************/
 
