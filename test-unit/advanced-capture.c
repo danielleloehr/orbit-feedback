@@ -1,6 +1,7 @@
 /*
  fa-capture under test
    VERSION 00.02.1 
+   Advanced functionality. Replaces uut-capture.c
 */
 
 #include "test_utils.h"
@@ -13,25 +14,18 @@
 #define ATTENDANCE_ALARM    0
 #define ATTENDANCE_MANUAL   0
 #define DUMP_PAYLOAD    	1
-#define IRQ_CNTRL_TEST      1       // not used
+#define IRQ_CNTRL_TEST      1      
 #define CPU_CORE            1
 /******************************/
 
+/* Interrupt Control                                */
 static int32_t irq_count;
 static int fd;
 static int loop_control;
 
-/* Attendance count                                 */
+/* Attendance Control                               */
 static int all_in;
-
-/* Attendance timer                                 */
 struct timespec start_attend, end_attend;  
-
-/* Universal tick-tock structs for IRQ timing       */
-/* CAREFUL: 
-    tic is set by the "STOP" thread.    
-    toc is set after the inner while loop is broken */
-struct timespec tic, toc;
 
 /* Address book                                     */
 /* Init in main(), no one else changes the contentst*/
@@ -41,8 +35,16 @@ struct bookKeeper book_keeper;
 /* No concurrent access needed                      */
 static struct packetRecord queue[NO_SPARKS][FRAME_COMPLETE];
 
+
+/* Universal tick-tock struct for IRQ timing        */
+/* CAREFUL: 
+    tic is set by the "STOP" thread.    
+    toc is set after the inner while loop is broken */
+struct timespec tic, toc;
+
+
 /********************************************/
-/* New Payload  - Test setup                */
+/* New Payload  - Test setup compatibility  */
 /********************************************/
 long int vA, vB, vC, vD, SUM, Q, X, Y;
 int LTM_l, LTM_h;
@@ -153,6 +155,8 @@ void display_current_config(void) {
         printf("Exiting now..\n");
         exit(EXIT_FAILURE); 
     #endif
+
+
 
     /* no warnings so far */
     printf("Capture will commence...\n");
@@ -269,23 +273,17 @@ static inline int start_capture(int socket_desc, int *buf, struct sockaddr_in cl
     }
 }
 
+
 int main(){    
 
     display_current_config();  
 
     /********************************************/
-    /* New Payload  - Test setup                */
+    /* Payload Compression                      */
     /********************************************/
-    vA = 0;
-	vB = 0;
-	vC = 0;
-	vD = 0;
-    SUM = 0;
-    Q = 0;    
-    X, Y = 0;
-    LTM_l, LTM_h = 0;
-    res1, res2, res3, res4, res5 = 0;
-    status = 0;
+    long int payload_sums[PAYLOAD_FIELDS];          // this could be bypassed in the future
+    int compact_payload[PAYLOAD_FIELDS]; 
+
 
     /********************************************/
     /* Packet Collection Parameters             */

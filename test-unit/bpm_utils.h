@@ -8,7 +8,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-
 /* LIBERA SPARK parameters */
 #define FRAME_COMPLETE 30
 #define PAYLOAD_FIELDS 16
@@ -80,8 +79,9 @@ static char ADDRESS_BOOK[32][16] = { "1.1.1.202", 	//32
                                      "1.1.1.171"
                                      };
 
+
 /************************************
- * GLOBAL FUNCTION PROTOTYPES
+ * FUNCTION PROTOTYPES
  ************************************/
 /* Initiliases the book keeper entity */
 void init_bookkeeper(struct bookKeeper *book_keeper) {
@@ -123,6 +123,7 @@ void print_addressbook(struct bookKeeper *book_keeper) {
     }
 }
 
+/* Not used */
 void print_payload(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
                    long int Q, long int X, long int Y) {
     printf("SPARK %d \t:", (32-n));

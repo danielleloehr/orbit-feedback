@@ -1,4 +1,4 @@
-CURRENT VERSION: 00.01.1
+CURRENT VERSION: 00.02.0
 
 Up-to-Date source code (Libera Spark packet capture) for Richard.
 
@@ -11,10 +11,13 @@ Date : 02.11.2023
 Number: 00.01.1 (demo)
 Date : 07.11.2023
 * Pending: Fix bugs Richard found --> CLOSED
-* Pending: Run on Richard
 
 
-Number: 00.02.0 (debug)
+Number: 00.02.0 (demo)
 Date : 08.11.2023
 * Pending: IRQ threading  --> CLOSED
 
+
+Number: 00.02.1 (debug)
+Date : 14.11.2023
+* Advanced
