@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "test_utils.h": "c",
+        "bpm_utils.h": "c",
+        "socket.h": "c",
+        "bpm.h": "c",
+        "sockets.h": "c",
+        "erapi.h": "c"
+    }
+}

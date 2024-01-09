@@ -2,10 +2,11 @@
  fa-capture under test
    VERSION 00.02.1 
    Advanced functionality. Replaces uut-capture.c
+   Disclaimer: I don't remember if this was completely tested (18/12/23)
 */
 
 #include "test_utils.h"
-#include "bpm_utils.h"
+#include "bpm.h"
 #include "sockets.h"
 
 /******************************/
@@ -58,7 +59,7 @@ int status;
 /****************************************************/
 
 void init_bookkeeper(struct bookKeeper *book_keeper);
-int prepare_socket(struct sockaddr_in server);
+int prepare_socket(struct sockaddr_in server, int listen);
 void print_payload(int compact_payload[PAYLOAD_FIELDS]);
 void print_addressbook(struct bookKeeper *book_keeper);
 int select_affinity(int core_id);  
@@ -161,6 +162,13 @@ void display_current_config(void) {
         printf("Exiting now..\n");
         exit(EXIT_FAILURE); 
     #endif
+
+    /* Warning for sudo rights */
+    if(check_sudo() != 0){
+        printf("%s\n", "\033[91mProceed as non-root user.\033[0m\n");
+    }else{
+        printf("Proceed as sudo.\n");
+    }
 
     /* no warnings so far */
     printf("Capture will commence...\n");
@@ -325,14 +333,11 @@ int main(){
     /********************************************/
     int local_desc; 
     struct sockaddr_in local_server;
-    if ((local_desc = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
-        perror("socket()");
-        return -1;
+    local_desc = prepare_socket(local_server, 0); 
+    if (local_desc == -1){
+        perror("Socket binding failed. Packets are not forwarded.\n");
     }
-
-    local_server.sin_family      = AF_INET;            
-    local_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); 
-
+    
     /********************************************/
     /* Socket for Listening                     */
     /********************************************/
@@ -357,15 +362,6 @@ int main(){
     /********************************************/
     //--bookkeeper used to be here
     init_bookkeeper(&book_keeper);
-    
-    /********************************************/
-    /* Open UIO device file                     */
-    /********************************************/
-    fd = open("/dev/uio0", O_RDWR);                             
-    if (fd < 0) {
-        perror("uio open: \n");
-        return errno;
-    }
 
     /********************************************/
     /* Thread Control                           */
@@ -374,7 +370,6 @@ int main(){
     int *notify_on = (int *) 1;                         // Don't make this global!
     /* Register "STOP" signal                   */
     signal(SIGUSR1, thread_handler);
-
 
     /* MAIN */
     #if LATENCY_PERF
@@ -385,7 +380,7 @@ int main(){
     /*******************************************/
     /* Some preparation for ATTENDANCE MANUAL  */
     /* Please do NOT move (time-critical)      */
-    /* Mind the possible additional delay      */
+    /* Mind the additional delay               */
     /*******************************************/
     clock_gettime(CLOCK_MONOTONIC, &start_attend);
 
@@ -396,6 +391,15 @@ int main(){
             packet_limit = packet_limit - accept;
         }      
     #else
+        /********************************************/          /* this for test phase */
+        /* Open UIO device file                     */
+        /********************************************/
+        fd = open("/dev/uio0", O_RDWR);                             
+        if (fd < 0) {
+            perror("uio open: \n");
+            return errno;
+        }
+
         do{
             print_debug_info("DEBUG: Waiting for start signal...\n");
             /* Start thread for "START" signal */

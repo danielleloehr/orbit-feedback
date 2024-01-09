@@ -27,6 +27,7 @@ struct packetRecord{
 struct bookKeeper{
     int count_per_libera[NO_SPARKS];    /* packet counter for each friend */
     int box_id[NO_SPARKS];              /* friends' IP addresses */
+    int buffer_index[NO_SPARKS];
 };
 
 /************************************
@@ -77,6 +78,7 @@ void init_bookkeeper(struct bookKeeper *book_keeper) {
     /* Copy from hard-coded address book */
     for(int i=0; i<NO_SPARKS; i++){
         book_keeper->count_per_libera[i] = 0;   
+        book_keeper->buffer_index[i] = 0; 
         book_keeper->box_id[i] = inet_addr(ADDRESS_BOOK[i]);
     } 
 }

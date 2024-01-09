@@ -1,6 +1,8 @@
 /*
  VERSION 00.01.1
- fa-capture +
+ fa-capture + send
+
+ Tested as is. (local)
 */
 
 #include "test_utils.h"
