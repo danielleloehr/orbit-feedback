@@ -32,7 +32,7 @@ int prepare_socket(struct sockaddr_in server, int listen) {
         return -1;
     }
 
-    /* Set up Listening if forward is not set to 1*/
+    /* Set up Listening for the RECEIVING socket */
     if(listen){
         /* Bind server to this socket.*/
         server.sin_family      = AF_INET;       /* Server is in Internet Domain */
@@ -43,9 +43,10 @@ int prepare_socket(struct sockaddr_in server, int listen) {
             perror("bind()");
             return -1;
         }
-    }else {
         
-
+    }else{
+        server.sin_family      = AF_INET;            
+        server.sin_addr.s_addr = inet_addr(LOCAL_ADDR);
     }
 
     return socket_desc;

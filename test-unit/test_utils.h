@@ -157,4 +157,9 @@ double get_elapsed_time_usec(struct timespec *tic, struct timespec *toc){
     return (double) nsecs/1000;     
 }
 
+int check_sudo(){
+	uid_t euid = geteuid();
+    return euid;
+}
+
 #endif
