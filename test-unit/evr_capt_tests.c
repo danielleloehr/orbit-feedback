@@ -1,8 +1,12 @@
 /*
  fa-capture under test
-   VERSION 00.02.0 
+   VERSION 00.03.0 
 
-   EVR testing
+   Main EVR test version
+   
+   Open issues and TODOs
+   - signal vs EINTR
+   - semi cyclic array
 */
 
 #include "test_utils.h"
@@ -14,9 +18,9 @@
 /******************************/
 /* OPERATION CONTROL          */
 #define LATENCY_PERF 	    0
+#define REGISTER 		    1
 
 /* OBSOLETE                   */
-#define REGISTER 		    0
 #define ATTENDANCE_ALARM    0
 #define ATTENDANCE_MANUAL   0
 /******************************/
@@ -26,15 +30,18 @@
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
-#define MAX_BUFF_SIZE 20000
+#define MAX_BUFF_SIZE 20000     // for one second more than enough
+static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL */
 
+/******************************/
 /* EVR */
 struct MrfErRegs *pEr;
 int              fdEr;
 static int fd;
-
 /* Control variable for the main while loop */
 static int send_data; 
+/******************************/
+
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -51,10 +58,11 @@ int select_affinity(int core_id);
 
 
 /* This will stop the wave when interrupt thread handles an IRQ */
-void thread_handler(int signum){
+void signal_ready_to_send(int signum){
 	print_debug_info("DEBUG: Concentrate and send signal in!.\n");
     /* Clock toc here, */
 	//clock_gettime(CLOCK_MONOTONIC, &toc);   
+    // Call send immediately
     send_data = 1;
 }
 
@@ -112,6 +120,52 @@ void *irqsetup(){
 
     /* Never reach */
     pthread_exit(NULL);
+}
+
+// depends on queue, I am not passing it... 
+void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server){
+    /********************************************/
+    /* Payload Compression                      */
+    /********************************************/
+    long long payload_sums[PAYLOAD_FIELDS];                              /*TODO*/
+    int compact_payload[PAYLOAD_FIELDS];
+
+    for(int i=0; i < 1; i++){	// not all sparks  /* CAREFUL*/ 
+        memset(payload_sums, 0 , sizeof(payload_sums));
+      
+        //int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
+        //printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
+				
+        // Assume buffer didn't "overflow" and always start from the beginning.
+        // there is a mechanism for overflow but nothing for data integrity
+        for(int curr_ind = 0; curr_ind < book_keeper->count_per_libera[i]; curr_ind++){ 
+            for(int payload_ind = 0; payload_ind< PAYLOAD_FIELDS; payload_ind++){
+                payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
+                //buffer_start++;
+            }                           
+        }
+		print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
+ 
+        // most lkely unnecessary 
+        for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
+            if(payload_sums[ind] == 0){
+                compact_payload[ind] = (int) payload_sums[ind];
+            }else{
+                compact_payload[ind] = (int) (payload_sums[ind]/book_keeper->count_per_libera[i]-1);
+            }
+        }
+
+        #if DUMP_PAYLOAD
+            print_payload(compact_payload);
+        #endif
+
+        sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
+
+        // Clean up
+        book_keeper->count_per_libera[i] = 0;
+        book_keeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
+        // Always overwrite the buffer. 
+    }
 }
 
 
@@ -181,31 +235,22 @@ void display_current_config(void) {
 
 int main(){    
 
-    display_current_config();  
-	
-    /********************************************/
-    /* Payload Compression                      */
-    /********************************************/
-    long int payload_sums[PAYLOAD_FIELDS];          // this could be bypassed in the future
-    int compact_payload[PAYLOAD_FIELDS]; 
+    display_current_config();   
 
     /********************************************/
     /* Packet Collection Parameters             */
     /********************************************/
     int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
     static struct packetRecord packet;   
-    //static struct packetRecord queue[NO_SPARKS][FRAME_COMPLETE];
 
-    /* CAREFUL */
-    static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE]; 
 
     /********************************************/
     /* Socket for Reception                     */
     /********************************************/
-    int socket_desc; 
-    struct sockaddr_in server;
-    socket_desc = prepare_socket(server, 1);    
-    if (socket_desc == -1){
+    int recv_sock; 
+    struct sockaddr_in receive_server;
+    recv_sock = prepare_socket(receive_server, 1);    
+    if (recv_sock == -1){
         perror("Socket binding failed. Exiting now..\n");
         exit(EXIT_FAILURE);
     }
@@ -218,16 +263,36 @@ int main(){
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
 
-    /********************************************/          /*TODO*/
+    /********************************************/                   /*TODO*/
     /* Socket for Transmission                       
        Test phase naming convention             */
     /********************************************/
-    int local_desc; 
-    struct sockaddr_in local_server;
-    local_desc = prepare_socket(local_server, 0); 
-    if (local_desc == -1){
-        perror("Socket binding failed. Packets are not forwarded.\n");
+    // int trans_sock; 
+    // struct sockaddr_in transmit_server;
+    // trans_sock = prepare_socket(transmit_server, 0); 
+    // if (trans_sock == -1){
+    //     perror("Socket binding failed. Packets are not forwarded.\n");
+    // }
+
+        // send test
+    int trans_sock;
+    unsigned short local_port;
+    struct sockaddr_in transmit_server;
+
+    local_port = htons(2049);
+
+    /* Create a datagram socket in the internet domain and use the
+    * default protocol (UDP).
+    */
+    if ((trans_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+        perror("socket()");
+        return -1;
     }
+
+    /* Set up the server name */
+    transmit_server.sin_family      = AF_INET;            /* Internet Domain    */
+    transmit_server.sin_port        = local_port;               /* Server Port        */
+    transmit_server.sin_addr.s_addr = inet_addr("192.168.2.200"); /* Server's Address   */
 
     /********************************************/
     /* Address Book                             */ 
@@ -255,146 +320,66 @@ int main(){
         printf("sec, nanosec\n");
     #endif
 
-    /*******************************************/
-    /* Some preparation for ATTENDANCE MANUAL  */
-    /* Please do NOT move (time-critical)      */
-    /*******************************************/
-    // struct timespec start, end;     
-	// int all = 0;
-    // clock_gettime(CLOCK_MONOTONIC, &start);
-
-
     /* Register the signal thread uses to communicate with main loop */
-	//signal(SIGUSR1, thread_handler);                      // reintroduce signal later. much cleaner
+	signal(SIGUSR1, signal_ready_to_send);                      // reintroduce signal later. much cleaner
     print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
     /* Start thread for interrupt handling */   
     pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
  
     while(1){
-        if(recvfrom(socket_desc, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
+        if(recvfrom(recv_sock, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
             /* Record the packet (only valid for extended structures) */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
-
-            memcpy(packet.liberaData, buf, 16*sizeof(int));  
-            packet.src_port = ntohs(client.sin_port);
-            packet.id = client.sin_addr.s_addr;  //inet_toa(client.sin_addr)
-
-            // Concentrate (after IRQ of course)
-            // Simple way. Probably not cheap
-
-            // New registery
-            for(int i=0; i<NO_SPARKS; i++){
-                // Get the box ID
-                if(packet.id == book_keeper.box_id[i]){                       
-                    // Put the packet in the corresponding queue, using current packet count as the index
-                    book_keeper.count_per_libera[i]++;
-
-                    // Check the buffer first
-                    if (book_keeper.buffer_index[i] < MAX_BUFF_SIZE){
-                        queue[i][book_keeper.buffer_index[i]] = packet ;
-                        book_keeper.buffer_index[i]++;
-                    }else {
-                        book_keeper.buffer_index[i] = 0;                         // go to beginning
-                        queue[i][book_keeper.buffer_index[i]] = packet ;    // then register the packet
-                    }
-                }
-
-            }
-
-            // IRQ signal then here:
-
-            if(send_data){
-                for(int i=0; i <NO_SPARKS; i++){
-                    memset(payload_sums, 0 , sizeof(payload_sums));
-                    // index the right packets and clean the queue.
-                    // TODO you have to find a way to test this with regular arrays please
-                    int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
-                
-                    for(int curr_ind = 0; curr_ind < book_keeper.count_per_libera[i]; curr_ind++){ 
-                        for(int payload_ind = 0; payload_ind< PAYLOAD_FIELDS; payload_ind++){
-                            payload_sums[payload_ind] += queue[i][buffer_start].liberaData[payload_ind];
-                            buffer_start++;
-                        }                           
-                    }
-
-                    // most lkely unnecessary 
-                    for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-                        compact_payload[ind] = (int) payload_sums[ind]/30;
-                    }
-                    #if DUMP_PAYLOAD
-                        print_payload(compact_payload);
-                    #endif
-
-                    // Clean up
-                    book_keeper.count_per_libera[i] = 0;
-                    book_keeper.buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
-                }
-                send_data = 0;
-            }
-            
-     
-	
 
             #if LATENCY_PERF
                 printf("%ld, %ld\n", packet.arrival.tv_sec, packet.arrival.tv_nsec); 
                 /* Human readable format */
                 // printf("%.5f\n",(double)packet.arrival.tv_sec + 1.0e-9 * packet.arrival.tv_nsec);  
             #endif
-			
- 
 
+           
+            #if REGISTER
+                memcpy(packet.liberaData, buf, 16*sizeof(int));  
+                packet.src_port = ntohs(client.sin_port);
+                packet.id = client.sin_addr.s_addr; 
+
+                // Semi-cyclic registeration
+                for(int i=0; i<NO_SPARKS; i++){
+                    if(packet.id == book_keeper.box_id[i]){             // Get the box ID                   
+                        book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
+
+                        // Check the buffer limits
+                        if (book_keeper.buffer_index[i] < MAX_BUFF_SIZE){
+                            queue[i][book_keeper.buffer_index[i]] = packet ;
+                            book_keeper.buffer_index[i]++;
+                        }else {
+                            book_keeper.buffer_index[i] = 0;                         // go to beginning
+                            queue[i][book_keeper.buffer_index[i]] = packet ;         // then register the packet
+                        }
+                    }
+                }
+
+            #endif   
+
+            if(send_data){
+                send_spark_data(&book_keeper,trans_sock, transmit_server);
+                send_data = 0;
+            }        
+            
         }else{
             perror("recvfrom()");
-		 if(errno == EINTR){
-printf("%d\n", book_keeper.count_per_libera[0]);
-			for(int i=0; i <1; i++){	// not all sparks
-                    memset(payload_sums, 0 , sizeof(payload_sums));
-                    // index the right packets and clean the queue.
-                    // TODO you have to find a way to test this with regular arrays please
-                    
-					//int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
-
-					//printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
-				
-                	// Assume buffer didn't "overflow" and always start from the beginning.
-					// there is a mechanism for overflow but nothing for data integrity
-                    for(int curr_ind = 0; curr_ind < book_keeper.count_per_libera[i]; curr_ind++){ 
-                        for(int payload_ind = 0; payload_ind< PAYLOAD_FIELDS; payload_ind++){
-                            payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
-                            //buffer_start++;
-                        }                           
-                    }
-					
-printf("payload sums 0 %d\n",  payload_sums[0]);
-
-                    // most lkely unnecessary 
-                    for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-						if(payload_sums[ind] == 0){
-							compact_payload[ind] = (int) payload_sums[ind];
-						}else{
-                        	compact_payload[ind] = (int) payload_sums[ind]/book_keeper.count_per_libera[i]-1;
-                    }
-}
-                    #if DUMP_PAYLOAD
-                        print_payload(compact_payload);
-                    #endif
-
-                    // Clean up
-                    book_keeper.count_per_libera[i] = 0;
-                    book_keeper.buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
-// always overwrite the buffer. 
-                }
-	
-}		
-             else {
-                 // all other errors
-               return -1;
-             }		
+            if(errno == EINTR){
+                send_spark_data(&book_keeper,trans_sock, transmit_server);
+                //continue;
+            }else {
+                // all other errors
+                return -1;
+            }		
         }
     } 
 
     /* Deallocate the socket*/
-    close(socket_desc);
+    close(recv_sock);
 
     return 0;
 }
