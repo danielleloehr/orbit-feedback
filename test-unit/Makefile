@@ -1,16 +1,16 @@
-IDIR = mrf-linux-api-master/api/
-#ODIR=mrf-linux-api-master/api/
+MRFDIR = mrf-linux-api-master/api/
 CC = gcc
-CFLAGS = -lpthread -I$(IDIR)
+CFLAGS = -lpthread -I$(MRFDIR)
 
 DEPS = bpm.h sockets.h test_utils.h 
-OBJ = evr_capt_tests.o bpm.o
+
+OBJ = evr_capt_tests.o bpm.o sockets.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 irq-capture: $(OBJ)
-	$(CC) -o $@ $^ $(IDIR)erapi.o $(IDIR)fracdiv.o -lpthread
+	$(CC) -o $@ $^ $(MRFDIR)erapi.o $(MRFDIR)fracdiv.o -lpthread
 
 clean:
 	rm -f *.o 

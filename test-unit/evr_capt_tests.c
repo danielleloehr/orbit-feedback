@@ -33,6 +33,11 @@
 #define MAX_BUFF_SIZE 20000     // for one second more than enough
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL */
 
+/* Main server information                          
+   Forward compressed packets to this address       */
+static char LOCAL_ADDR[16] = "192.168.2.200"; 
+static int LOCAL_PORT = 2049;                           // different than 2048
+
 /******************************/
 /* EVR */
 struct MrfErRegs *pEr;
@@ -50,10 +55,6 @@ static int send_data;
 struct timespec tic, toc;       // not used right now
 
 
-void init_bookkeeper(struct bookKeeper *book_keeper);
-int prepare_socket(struct sockaddr_in server, int listen);
-void print_payload(int compact_payload[PAYLOAD_FIELDS]);
-void print_addressbook(struct bookKeeper *book_keeper);
 int select_affinity(int core_id); 
 
 
@@ -69,18 +70,17 @@ void signal_ready_to_send(int signum){
 
 
 void evr_irq_handler(int param){
-  int flags, i;
-  struct FIFOEvent fe;
+    int flags, i;
+    struct FIFOEvent fe;
 
-  flags = EvrGetIrqFlags(pEr);
+    flags = EvrGetIrqFlags(pEr);
 
-  if (flags & (1 << C_EVR_IRQFLAG_PULSE)){
-      printf("Pulse IRQ\n");
-        EvrClearIrqFlags(pEr, (1 << C_EVR_IRQFLAG_PULSE));
-        	
+    if (flags & (1 << C_EVR_IRQFLAG_PULSE)){
+        printf("Pulse IRQ\n");
+        EvrClearIrqFlags(pEr, (1 << C_EVR_IRQFLAG_PULSE));  	
     }
  	EvrIrqHandled(fdEr);
-   //raise(SIGUSR1);
+    raise(SIGUSR1);
 }
 
 
@@ -144,9 +144,9 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
                 //buffer_start++;
             }                           
         }
-		print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
- 
-        // most lkely unnecessary 
+		//print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
+
+        // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
             if(payload_sums[ind] == 0){
                 compact_payload[ind] = (int) payload_sums[ind];
@@ -243,14 +243,14 @@ int main(){
     int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
     static struct packetRecord packet;   
 
-
     /********************************************/
-    /* Socket for Reception                     */
+    /* Socket for Reception to collect original */
+    /*  data                                    */
     /********************************************/
-    int recv_sock; 
+    int sock_collection; 
     struct sockaddr_in receive_server;
-    recv_sock = prepare_socket(receive_server, 1);    
-    if (recv_sock == -1){
+    sock_collection = prepare_socket(receive_server);    
+    if (sock_collection == -1){
         perror("Socket binding failed. Exiting now..\n");
         exit(EXIT_FAILURE);
     }
@@ -263,36 +263,22 @@ int main(){
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
 
-    /********************************************/                   /*TODO*/
-    /* Socket for Transmission                       
-       Test phase naming convention             */
+    /********************************************/                  
+    /* Socket to collect concentrated packets   */
     /********************************************/
-    // int trans_sock; 
-    // struct sockaddr_in transmit_server;
-    // trans_sock = prepare_socket(transmit_server, 0); 
-    // if (trans_sock == -1){
-    //     perror("Socket binding failed. Packets are not forwarded.\n");
-    // }
-
-        // send test
-    int trans_sock;
+    int sock_concentrated;
     unsigned short local_port;
     struct sockaddr_in transmit_server;
 
-    local_port = htons(2049);
-
-    /* Create a datagram socket in the internet domain and use the
-    * default protocol (UDP).
-    */
-    if ((trans_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+    if ((sock_concentrated = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
         perror("socket()");
         return -1;
     }
 
     /* Set up the server name */
-    transmit_server.sin_family      = AF_INET;            /* Internet Domain    */
-    transmit_server.sin_port        = local_port;               /* Server Port        */
-    transmit_server.sin_addr.s_addr = inet_addr("192.168.2.200"); /* Server's Address   */
+    transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
+    transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
+    transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
 
     /********************************************/
     /* Address Book                             */ 
@@ -327,7 +313,7 @@ int main(){
     pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
  
     while(1){
-        if(recvfrom(recv_sock, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
+        if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
             /* Record the packet (only valid for extended structures) */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
 
@@ -362,15 +348,15 @@ int main(){
             #endif   
 
             if(send_data){
-                send_spark_data(&book_keeper,trans_sock, transmit_server);
+                send_spark_data(&book_keeper,sock_concentrated, transmit_server);
                 send_data = 0;
             }        
             
         }else{
             perror("recvfrom()");
             if(errno == EINTR){
-                send_spark_data(&book_keeper,trans_sock, transmit_server);
-                //continue;
+                //send_spark_data(&book_keeper,sock_concentrated, transmit_server);
+                continue;
             }else {
                 // all other errors
                 return -1;
@@ -378,8 +364,10 @@ int main(){
         }
     } 
 
+    /* Never reach */
     /* Deallocate the socket*/
-    close(recv_sock);
+    close(sock_collection);
+    close(sock_concentrated);
 
     return 0;
 }
