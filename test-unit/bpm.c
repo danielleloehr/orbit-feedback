@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <arpa/inet.h>
+
 #include "bpm.h"
 
 /* Initiliases the book keeper entity */

@@ -2,8 +2,6 @@
 #ifndef BPM
 #define BPM
 
-#include <arpa/inet.h>
-
 /* LIBERA SPARK parameters */
 #define FRAME_COMPLETE 30
 #define PAYLOAD_FIELDS 16
@@ -80,5 +78,5 @@ void print_addressbook(struct bookKeeper *book_keeper);
 void print_payload(int payload[PAYLOAD_FIELDS]);
 void print_payload_test(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
                    long int Q, long int X, long int Y);
-                   
+
 #endif
