@@ -18,14 +18,14 @@
 /******************************/
 /* OPERATION CONTROL          */
 #define LATENCY_PERF 	    0
-#define REGISTER 		    1
+#define REGISTER 		    0
 
 /* OBSOLETE                   */
 #define ATTENDANCE_ALARM    0
 #define ATTENDANCE_MANUAL   0
 /******************************/
 
-#define DUMP_PAYLOAD    	1
+#define DUMP_PAYLOAD    	0
 #define CPU_CORE            1
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
@@ -44,7 +44,7 @@ struct MrfErRegs *pEr;
 int              fdEr;
 static int fd;
 /* Control variable for the main while loop */
-static int send_data; 
+static volatile int send_data;  //?? volatile
 /******************************/
 
 
@@ -54,6 +54,7 @@ static int send_data;
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
 
+static int GLOBAL_PACKET_COUNTER;
 
 int select_affinity(int core_id); 
 
@@ -64,6 +65,7 @@ void signal_ready_to_send(int signum){
     /* Clock toc here, */
 	//clock_gettime(CLOCK_MONOTONIC, &toc);   
     // Call send immediately
+    print_debug_info("DEBUG: Counter in signal handler : %d.\n", GLOBAL_PACKET_COUNTER);
     send_data = 1;
 }
 
@@ -74,17 +76,22 @@ void evr_irq_handler(int param){
     struct FIFOEvent fe;
 
     flags = EvrGetIrqFlags(pEr);
+    print_debug_info("DEBUG: Counter in interrupt handler : %d.\n", GLOBAL_PACKET_COUNTER);
 
     if (flags & (1 << C_EVR_IRQFLAG_PULSE)){
-        printf("Pulse IRQ\n");
+        clock_gettime(CLOCK_MONOTONIC, &tic); 
+        print_debug_info("%.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
+        //raise(SIGUSR1);
+        print_debug_info("Pulse IRQ\n");
         EvrClearIrqFlags(pEr, (1 << C_EVR_IRQFLAG_PULSE));  	
     }
+    GLOBAL_PACKET_COUNTER = 0;
  	EvrIrqHandled(fdEr);
-    raise(SIGUSR1);
 }
 
 
 void *irqsetup(){
+    select_affinity(CPU_CORE);
     EvrEnable(pEr, 1);
     if (!EvrGetEnable(pEr))
         {
@@ -254,6 +261,10 @@ int main(){
         perror("Socket binding failed. Exiting now..\n");
         exit(EXIT_FAILURE);
     }
+    
+    /**/
+	long extend_buffer = 16777216;
+	setsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF,&extend_buffer, sizeof(long)); 
 
     /********************************************/
     /* Client parameters for packet reception   */
@@ -313,9 +324,15 @@ int main(){
     pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
  
     while(1){
+        if(send_data){
+            send_spark_data(&book_keeper,sock_concentrated, transmit_server);
+            send_data = 0;
+        }  
+
         if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
             /* Record the packet (only valid for extended structures) */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
+            GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF
                 printf("%ld, %ld\n", packet.arrival.tv_sec, packet.arrival.tv_nsec); 
@@ -347,10 +364,7 @@ int main(){
 
             #endif   
 
-            if(send_data){
-                send_spark_data(&book_keeper,sock_concentrated, transmit_server);
-                send_data = 0;
-            }        
+         
             
         }else{
             perror("recvfrom()");
