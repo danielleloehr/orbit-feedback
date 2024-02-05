@@ -1,32 +1,31 @@
 /*
  fa-capture under test
-   VERSION 00.03.0 
+   VERSION 00.03.1  -- latest change : cleanup 
 
    Main EVR test version
    
    Open issues and TODOs
-   - signal vs EINTR
-   - semi cyclic array
+   - signal, EINTR
+   - array overflows
 */
 
 #include "test_utils.h"
 #include "bpm.h"
 #include "sockets.h"
-
+ 
 #include "erapi.h" 
+#include "egapi.h"
+
+#include<sys/wait.h>
 
 /******************************/
 /* OPERATION CONTROL          */
 #define LATENCY_PERF 	    0
 #define REGISTER 		    0
-
-/* OBSOLETE                   */
-#define ATTENDANCE_ALARM    0
-#define ATTENDANCE_MANUAL   0
-/******************************/
-
-#define DUMP_PAYLOAD    	0
+#define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
+#define ALARM_USEC       	6666.66  //6666.66 // 1 second)
+#define EVR_EVM_PRESENT     0
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
@@ -35,6 +34,7 @@ static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL *
 
 /* Main server information                          
    Forward compressed packets to this address       */
+/* TODO: replace by ZeroMQ */
 static char LOCAL_ADDR[16] = "192.168.2.200"; 
 static int LOCAL_PORT = 2049;                           // different than 2048
 
@@ -44,9 +44,19 @@ struct MrfErRegs *pEr;
 int              fdEr;
 static int fd;
 /* Control variable for the main while loop */
-static volatile int send_data;  //?? volatile
+static volatile int send_data;
 /******************************/
 
+/******************************/
+/* EVG */
+struct MrfEgRegs *pEg;
+int              fdEg;
+static int fg;
+/******************************/
+
+/* Additional test variables */
+static int GLOBAL_PACKET_COUNTER;
+struct in_addr ip_addr; 
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -54,22 +64,35 @@ static volatile int send_data;  //?? volatile
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
 
-static int GLOBAL_PACKET_COUNTER;
 
 int select_affinity(int core_id); 
 
+/* Artifial pacemaker to set the rate at which 
+    compressed packets should be sent */
+void concentration_pacemaker(int s){
+	//EvgSendSWEvent(pEg, 1);
+	send_data = 1;
+	print_debug_info("DEBUG: Alarm!.\n");
+	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", counter);
+	counter = 0;
+	clock_gettime(CLOCK_MONOTONIC, &tic);
+	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
+	
+    /* Repeatedly set the alarm for the next wave */
+TRY:
+	ualarm(ALARM_USEC, 0);		// use 1000000 -1 
+	signal(SIGALRM, concentration_pacemaker);
+}
 
+//-------------------------------------------------------------------------------------------------
 /* This will stop the wave when interrupt thread handles an IRQ */
 void signal_ready_to_send(int signum){
 	print_debug_info("DEBUG: Concentrate and send signal in!.\n");
     /* Clock toc here, */
 	//clock_gettime(CLOCK_MONOTONIC, &toc);   
-    // Call send immediately
     print_debug_info("DEBUG: Counter in signal handler : %d.\n", GLOBAL_PACKET_COUNTER);
     send_data = 1;
 }
-
-
 
 void evr_irq_handler(int param){
     int flags, i;
@@ -87,6 +110,7 @@ void evr_irq_handler(int param){
     }
     GLOBAL_PACKET_COUNTER = 0;
  	EvrIrqHandled(fdEr);
+
 }
 
 
@@ -123,11 +147,12 @@ void *irqsetup(){
     EvrIrqAssignHandler(pEr, fdEr, &evr_irq_handler);
     EvrIrqEnable(pEr, EVR_IRQ_MASTER_ENABLE | EVR_IRQFLAG_PULSE);
 
-    while(1);  // "wait for IRQs in the background"
-
+    //while(1);  // "wait for IRQs in the background"
+    wait(NULL);     // be nice to CPU
     /* Never reach */
-    pthread_exit(NULL);
+    //pthread_exit(NULL);
 }
+//-------------------------------------------------------------------------------------------------
 
 // depends on queue, I am not passing it... 
 void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server){
@@ -196,15 +221,6 @@ void display_current_config(void) {
     printf("Packet Registery: ");
     fancy_print(REGISTER);
 
-    printf("Attendance Check with Alarm: ");
-    fancy_print(ATTENDANCE_ALARM);
-    #if ATTENDANCE_ALARM
-        printf("Time interval for attendance check: %d usec\n", TIME_LIMIT_USEC);
-    #endif    
-    
-    printf("Attendance Check (Manual): ");
-    fancy_print(ATTENDANCE_MANUAL);
-
     printf("\n");
 
     printf("Packet Collection Parameters\n");
@@ -221,18 +237,6 @@ void display_current_config(void) {
 
     printf("---------------------------------------\n");
     
-    #if ATTENDANCE_ALARM && ATTENDANCE_MANUAL
-        printf("%s\n", "\033[91mWarning: Please select exactly ONE attendance modus!\033[0m");
-        printf("Exiting now..\n");
-        exit(EXIT_FAILURE);
-    #endif
-
-    #if (ATTENDANCE_ALARM || ATTENDANCE_MANUAL) && !REGISTER
-        printf("%s\n", "\033[91mWarning: REGISTER must be set for attendance check!\033[0m");
-        printf("Exiting now..\n");
-        exit(EXIT_FAILURE); 
-    #endif
-
     /* no warnings so far */
     printf("Capture will commence...\n");
 
@@ -300,11 +304,17 @@ int main(){
     /********************************************/
     /* Open EVR device                          */ 
     /********************************************/
-    fdEr = EvrOpen(&pEr, "/dev/era3");
-  
-    if (fdEr == -1){
-      return errno;
-    } 
+    #if EVR_EVM_PRESENT 
+        fdEr = EvrOpen(&pEr, "/dev/era3");
+        if (fdEr == -1){
+            return errno;
+        } 
+
+        fdEg = EvgOpen(&pEg, "/dev/ega3");
+        if (fdEg == -1){
+            return errno;
+        }
+    #endif
 
     /********************************************/
     /* Thread Control                           */
@@ -318,15 +328,20 @@ int main(){
     #endif
 
     /* Register the signal thread uses to communicate with main loop */
-	signal(SIGUSR1, signal_ready_to_send);                      // reintroduce signal later. much cleaner
-    print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
+	//signal(SIGUSR1, signal_ready_to_send);                      // reintroduce signal later. much cleaner
+    //print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
     /* Start thread for interrupt handling */   
-    pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
- 
+    //pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
+    
+    GLOBAL_PACKET_COUNTER = 0;
+    ualarm(ALARM_USEC, 0);
+	signal(SIGALRM, concentration_pacemaker);
+
     while(1){
         if(send_data){
             send_spark_data(&book_keeper,sock_concentrated, transmit_server);
             send_data = 0;
+            GLOBAL_PACKET_COUNTER = 0;
         }  
 
         if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){

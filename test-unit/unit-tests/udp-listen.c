@@ -8,7 +8,7 @@
 #include <unistd.h>     // close()
 
 
-static char IP_ADDR[16] = "192.168.1.200";//"192.168.2.22";       /* Server's Internet Address  */
+static char IP_ADDR[16] = "192.168.2.200";//"192.168.2.22";       /* Server's Internet Address  */
 static int PORT = 2049;                         /* Libera default port      */
 static int PACKET_MAX = 1000;                   /* Number of packets to accept until socket is closed*/
 
@@ -61,7 +61,7 @@ int main (){
 
     int liberaData[16];
 
-    printf("sec, nanosec\n");
+    printf("vA\t vB\t vC\t vD\t Sum\t Q\t X\t Y\t LTM_h\t LTM_l\t Ap\t Bp\t Cp\t Dp\t rS\t Status\n");
     while(packet_limit > 0){
         if(recvfrom(socket_desc, buf, sizeof(buf), 0, (struct sockaddr *) &client,
         &client_addr_size) >= 0){
