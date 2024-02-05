@@ -73,8 +73,8 @@ void concentration_pacemaker(int s){
 	//EvgSendSWEvent(pEg, 1);
 	send_data = 1;
 	print_debug_info("DEBUG: Alarm!.\n");
-	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", counter);
-	counter = 0;
+	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
+	GLOBAL_PACKET_COUNTER = 0;
 	clock_gettime(CLOCK_MONOTONIC, &tic);
 	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
 	

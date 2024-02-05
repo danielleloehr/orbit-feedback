@@ -1,26 +1,35 @@
 IDIR = ./include
 CC = gcc
-CFLAGS = -Wall -I.
+CFLAGS = -Wall
 
-ODIR = obj
-MRFDIR = mrf-linux-api-master/api/	#
+MRFDIR = mrf-linux-api-master/api/
 
 _DEPS = bpm.h sockets.h test_utils.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = bpm.o sockets.o
-OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+OBJ = evr_capt_tests.o bpm.o sockets.o
 
-TARGET = irq-capture #
+TARGET = irq-capture
 
-$(ODIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+all : $(TARGET) $(OBJ)
+
+#%.o: $(IDIR)/%.c $(DEPS)
+#	$(CC) -c -o $@ $< $(CFLAGS)
+
+bpm.o : $(IDIR)/bpm.c $(IDIR)/bpm.h
+	$(CC) -c $^ -I$(IDIR)
+
+sockets.o : $(IDIR)/sockets.c $(IDIR)/sockets.h
+	$(CC) -c $^ -I$(IDIR)
+
+evr_capt_tests.o: evr_capt_tests.c $(DEPS)
+	$(CC) -c $^ -I$(IDIR) -I$(MRFDIR)
 
 # Build irq-capture 
-$(TARGET): $(OBJECTS)
-	$(CC) -o $@ $^ $(CFLAGS) $(MRFDIR)erapi.o $(MRFDIR)fracdiv.o -lpthread -I$(MRFDIR)
+$(TARGET): $(OBJ) $(DEPS)
+	$(CC) -o $@ $^ $(CFLAGS) $(MRFDIR)erapi.o $(MRFDIR)fracdiv.o -lpthread 
 
 .PHONY: clean
 
 clean:
-	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~ 
+	rm -f $(OBJ) *~

@@ -2,6 +2,8 @@
 #ifndef BPM
 #define BPM
 
+#include <time.h>
+
 /* LIBERA SPARK parameters */
 #define FRAME_COMPLETE 30
 #define PAYLOAD_FIELDS 16
