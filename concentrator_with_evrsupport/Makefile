@@ -3,6 +3,8 @@ CC = gcc
 CFLAGS = -Wall
 
 MRFDIR = mrf-linux-api-master/api/
+_MRFSRC = egapi.o erapi.o fracdiv.o 
+MRFSRC = $(patsubst %,$(MRFDIR)/%,$(_MRFSRC))
 
 _DEPS = bpm.h sockets.h test_utils.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
@@ -17,17 +19,17 @@ all : $(TARGET) $(OBJ)
 #	$(CC) -c -o $@ $< $(CFLAGS)
 
 bpm.o : $(IDIR)/bpm.c $(IDIR)/bpm.h
-	$(CC) -c $^ -I$(IDIR)
+	$(CC) -c $^
 
 sockets.o : $(IDIR)/sockets.c $(IDIR)/sockets.h
-	$(CC) -c $^ -I$(IDIR)
+	$(CC) -c $^
 
 evr_capt_tests.o: evr_capt_tests.c $(DEPS)
 	$(CC) -c $^ -I$(IDIR) -I$(MRFDIR)
 
 # Build irq-capture 
-$(TARGET): $(OBJ) $(DEPS)
-	$(CC) -o $@ $^ $(CFLAGS) $(MRFDIR)erapi.o $(MRFDIR)fracdiv.o -lpthread 
+$(TARGET): $(OBJ) $(DEPS) $(MRFSRC)
+	$(CC) -o $@ $^ $(CFLAGS) -lpthread
 
 .PHONY: clean
 
