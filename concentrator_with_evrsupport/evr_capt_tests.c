@@ -1,6 +1,6 @@
 /*
  fa-capture under test
-   VERSION 00.03.1  -- latest change : cleanup 
+   VERSION 00.04.0  -- Richards version 
 
    Main EVR test version
    
@@ -9,23 +9,24 @@
    - array overflows
 */
 
-#include "test_utils.h"
+#include "test_utils.h"		// keep this here GNU_SOURCE
 #include "bpm.h"
 #include "sockets.h"
  
 #include "erapi.h" 
 #include "egapi.h"
 
+#include <zmq.h>
 #include<sys/wait.h>
 
 /******************************/
 /* OPERATION CONTROL          */
 #define LATENCY_PERF 	    0
-#define REGISTER 		    0
+#define REGISTER 		    1
 #define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
 #define ALARM_USEC       	6666.66  //6666.66 // 1 second)
-#define EVR_EVM_PRESENT     0
+#define EVR_EVM_PRESENT     1
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
@@ -42,7 +43,6 @@ static int LOCAL_PORT = 2049;                           // different than 2048
 /* EVR */
 struct MrfErRegs *pEr;
 int              fdEr;
-static int fd;
 /* Control variable for the main while loop */
 static volatile int send_data;
 /******************************/
@@ -51,12 +51,15 @@ static volatile int send_data;
 /* EVG */
 struct MrfEgRegs *pEg;
 int              fdEg;
-static int fg;
 /******************************/
+
+struct Message{
+		int spark_id;
+        int payload[16];
+};
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
-struct in_addr ip_addr; 
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -64,13 +67,10 @@ struct in_addr ip_addr;
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
 
-
-int select_affinity(int core_id); 
-
 /* Artifial pacemaker to set the rate at which 
     compressed packets should be sent */
 void concentration_pacemaker(int s){
-	//EvgSendSWEvent(pEg, 1);
+	EvgSendSWEvent(pEg, 1);
 	send_data = 1;
 	print_debug_info("DEBUG: Alarm!.\n");
 	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
@@ -79,7 +79,6 @@ void concentration_pacemaker(int s){
 	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
 	
     /* Repeatedly set the alarm for the next wave */
-TRY:
 	ualarm(ALARM_USEC, 0);		// use 1000000 -1 
 	signal(SIGALRM, concentration_pacemaker);
 }
@@ -95,7 +94,7 @@ void signal_ready_to_send(int signum){
 }
 
 void evr_irq_handler(int param){
-    int flags, i;
+    int flags;
     struct FIFOEvent fe;
 
     flags = EvrGetIrqFlags(pEr);
@@ -150,12 +149,12 @@ void *irqsetup(){
     //while(1);  // "wait for IRQs in the background"
     wait(NULL);     // be nice to CPU
     /* Never reach */
-    //pthread_exit(NULL);
+    pthread_exit(NULL);
 }
 //-------------------------------------------------------------------------------------------------
 
 // depends on queue, I am not passing it... 
-void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server){
+void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server, void *requester, struct Message msg){
     /********************************************/
     /* Payload Compression                      */
     /********************************************/
@@ -191,7 +190,12 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
             print_payload(compact_payload);
         #endif
 
-        sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
+        //sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
+
+
+        memcpy(msg.payload, compact_payload, sizeof(compact_payload));
+		msg.spark_id = 202 - i;	// this should display the "last xxx" of the IP address
+        zmq_send(requester, &msg, sizeof(struct Message), 0);
 
         // Clean up
         book_keeper->count_per_libera[i] = 0;
@@ -282,7 +286,6 @@ int main(){
     /* Socket to collect concentrated packets   */
     /********************************************/
     int sock_concentrated;
-    unsigned short local_port;
     struct sockaddr_in transmit_server;
 
     if ((sock_concentrated = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
@@ -294,6 +297,22 @@ int main(){
     transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
     transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
     transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
+
+    /********************************************/
+    /* ZeroMQ PUSH/PULL messaging line */
+    /********************************************/
+    struct Message msg;
+
+    void *context = zmq_ctx_new ();
+    void *requester = zmq_socket (context, ZMQ_PUSH);
+
+	/* Single Spark experiment */
+	/* Connect to one listening socket */
+	char libera_send_address[27];
+	int sparkport = 9999;
+	snprintf(libera_send_address, sizeof(libera_send_address), "%s%s%s%d", "tcp://", LOCAL_ADDR,":", sparkport);	
+
+    zmq_connect (requester, libera_send_address);
 
     /********************************************/
     /* Address Book                             */ 
@@ -339,7 +358,7 @@ int main(){
 
     while(1){
         if(send_data){
-            send_spark_data(&book_keeper,sock_concentrated, transmit_server);
+            send_spark_data(&book_keeper,sock_concentrated, transmit_server, requester, msg);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
@@ -392,6 +411,8 @@ int main(){
             }		
         }
     } 
+    zmq_close (requester);
+    zmq_ctx_destroy (context);
 
     /* Never reach */
     /* Deallocate the socket*/
