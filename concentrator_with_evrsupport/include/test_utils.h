@@ -146,6 +146,8 @@ void fancy_print(int boolean) {
 char *humanise(int boolean) {
      if (boolean == 1) return "ON";
      if (boolean == 0) return "OFF";
+
+     return 0;
 }
 
 /*

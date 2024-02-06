@@ -95,8 +95,6 @@ void signal_ready_to_send(int signum){
 
 void evr_irq_handler(int param){
     int flags;
-    struct FIFOEvent fe;
-
     flags = EvrGetIrqFlags(pEr);
     print_debug_info("DEBUG: Counter in interrupt handler : %d.\n", GLOBAL_PACKET_COUNTER);
 
@@ -206,8 +204,6 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
 
 
 void display_current_config(void) {
-    char line[16];
-    
     printf("---------------------------------------\n");
     printf("Current Capture Configuration\n");
     #if IRQ_CNTRL_TEST 
@@ -255,7 +251,7 @@ int main(){
     /********************************************/
     /* Packet Collection Parameters             */
     /********************************************/
-    int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
+    //int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
     static struct packetRecord packet;   
 
     /********************************************/
@@ -363,7 +359,7 @@ int main(){
             GLOBAL_PACKET_COUNTER = 0;
         }  
 
-        if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, &client_addr_size) >= 0){
+        if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, (socklen_t *) &client_addr_size) >= 0){
             /* Record the packet (only valid for extended structures) */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
             GLOBAL_PACKET_COUNTER++;
