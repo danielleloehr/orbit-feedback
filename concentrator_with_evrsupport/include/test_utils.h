@@ -18,8 +18,7 @@
 #include <stdarg.h>
 #include <termios.h>
 #include <signal.h>
-#include <time.h>     
-
+//careful <time.h> here caused an one time issue that never happened before
 #include <errno.h> 
 
 
