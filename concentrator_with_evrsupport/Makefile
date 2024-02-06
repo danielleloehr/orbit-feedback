@@ -1,6 +1,6 @@
 IDIR = ./include
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -std=c11
 
 MRFDIR = mrf-linux-api-master/api/
 _MRFSRC = egapi.o erapi.o fracdiv.o 
@@ -25,11 +25,11 @@ sockets.o : $(IDIR)/sockets.c $(IDIR)/sockets.h
 	$(CC) -c $^
 
 evr_capt_tests.o: evr_capt_tests.c $(DEPS)
-	$(CC) -c $^ -I$(IDIR) -I$(MRFDIR)
+	$(CC) $(CFLAGS) -c $^ -I$(IDIR) -I$(MRFDIR)
 
 # Build irq-capture 
 $(TARGET): $(OBJ) $(DEPS) $(MRFSRC)
-	$(CC) -o $@ $^ $(CFLAGS) -lpthread
+	$(CC) $(CFLAGS) -o $@ $^  -lpthread -lzmq
 
 .PHONY: clean
 
