@@ -1,3 +1,10 @@
 .vscode/c_cpp_properties.json
 .vscode/settings.json
 .vscode
+concentrator_with_evrsupport/include/bpm.h.gch
+concentrator_with_evrsupport/include/sockets.h.gch
+concentrator_with_evrsupport/include/test_utils.h.gch
+concentrator_with_evrsupport/bpm.o
+concentrator_with_evrsupport/evr_capt_tests.o
+concentrator_with_evrsupport/sockets.o
+concentrator_with_evrsupport/irq-capture

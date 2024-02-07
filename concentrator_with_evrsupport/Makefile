@@ -2,7 +2,7 @@ IDIR = ./include
 CC = gcc
 CFLAGS = -Wall -std=c11
 
-MRFDIR = mrf-linux-api-master/api/
+MRFDIR = /root/src/mrf-linux-api-master/api/
 _MRFSRC = egapi.o erapi.o fracdiv.o 
 MRFSRC = $(patsubst %,$(MRFDIR)/%,$(_MRFSRC))
 
