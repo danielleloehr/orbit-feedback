@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <arpa/inet.h>
-
 #include "bpm.h"
 
 /* Initiliases the book keeper entity */
@@ -27,8 +24,6 @@ void print_payload(int payload[PAYLOAD_FIELDS]){
     }
     printf("\n");
 }
-
-
 
 /* Not used */
 void print_payload_test(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 

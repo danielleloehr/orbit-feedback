@@ -9,15 +9,15 @@
    - array overflows
 */
 
-#include "test_utils.h"		// keep this here GNU_SOURCE
+#include "misc_utils.h"		// keep this here GNU_SOURCE
 #include "bpm.h"
-#include "sockets.h"
+#include "net_helpers.h"
  
 #include "erapi.h" 
 #include "egapi.h"
 
 #include <zmq.h>
-#include<sys/wait.h>
+#include <sys/wait.h>
 
 /******************************/
 /* OPERATION CONTROL          */
@@ -52,11 +52,6 @@ static volatile int send_data;
 struct MrfEgRegs *pEg;
 int              fdEg;
 /******************************/
-
-struct Message{
-		int spark_id;
-        int payload[16];
-};
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;

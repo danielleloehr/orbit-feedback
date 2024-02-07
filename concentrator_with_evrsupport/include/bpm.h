@@ -2,6 +2,8 @@
 #ifndef BPM
 #define BPM
 
+#include <stdio.h>
+#include <arpa/inet.h>
 #include <time.h>
 
 /* LIBERA SPARK parameters */
@@ -31,10 +33,6 @@ struct bookKeeper{
     int box_id[NO_SPARKS];              /* friends' IP addresses */
     int buffer_index[NO_SPARKS];
 };
-
-/************************************
- * EXPORTED VARIABLES
- ************************************/
 
 /* Hardcoded address book*/
 static char ADDRESS_BOOK[32][16] = { "1.1.1.202", 	//32

@@ -1,8 +1,4 @@
-#include <stdio.h>
-#include <errno.h>      // perror()
-
-#include "sockets.h"
-
+#include "net_helpers.h"
 
 int prepare_socket(struct sockaddr_in server) {
     int socket_desc;
