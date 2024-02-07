@@ -17,13 +17,15 @@
 #include <assert.h>
 
 struct Message{
-    int spark_id;
+    char spark_id[5];
     int payload[16];
     //int payload_all[128];       //payload for 8 sparks
 };
 
-
-int main (void){   
+/* argc[1] -- Spark filter in format s(xxx) where xxx is the 
+    identifier in IP address*/
+    
+int main (int argc, char *argv []){   
     // Socket to communicate with Richards
     /* Note on messaging pattern:
         request and reply doesn't work with our model 
@@ -39,7 +41,8 @@ int main (void){
   //  perror("zmq_bind to 5555");
     
     int rc = zmq_bind (responder, "tcp://*:9999");  
-    zmq_setsockopt (responder, ZMQ_SUBSCRIBE, " ", 0);
+    const char *filter = (argc > 1)? argv [1]: "s201";
+    zmq_setsockopt (responder, ZMQ_SUBSCRIBE, filter, strlen(filter));
     assert (rc == 0);
     perror("zmq_bind to 9999");
 
@@ -56,7 +59,7 @@ int main (void){
 
         //const char *user_id = zmq_msg_gets (&zmsg, "Socket-Type");
 
-        printf ("\nSpark %d sent this: \n", msg->spark_id);
+        printf ("\nSpark %s sent this: \n", msg->spark_id);
         /* Show me the message now */
         for(int i=0; i<16; i++){
             if (i % 16 == 0){
