@@ -54,7 +54,7 @@ int              fdEg;
 /******************************/
 
 struct Message{
-		int spark_id;
+		char spark_id[5];
         int payload[16];
 };
 
@@ -190,10 +190,10 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
 
         //sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
-
         memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-		msg.spark_id = 202 - i;	// this should display the "last xxx" of the IP address
-        zmq_send(requester, &msg, sizeof(struct Message), 0);
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%d", "s", 202);
+	// this should display the "last xxx" of the IP address
+        zmq_send(requester, &msg, sizeof(struct Message), 0);  //btw this works I am just trying to figure out why alarm stops working
 
         // Clean up
         book_keeper->count_per_libera[i] = 0;
@@ -300,12 +300,12 @@ int main(){
     struct Message msg;
 
     void *context = zmq_ctx_new ();
-    void *requester = zmq_socket (context, ZMQ_PUSH);
+    void *requester = zmq_socket (context, ZMQ_PUB);
 
 	/* Single Spark experiment */
 	/* Connect to one listening socket */
 	char libera_send_address[27];
-	int sparkport = 9999;
+	int sparkport = 9999;   // in case you would like to send to different ports       
 	snprintf(libera_send_address, sizeof(libera_send_address), "%s%s%s%d", "tcp://", LOCAL_ADDR,":", sparkport);	
 
     zmq_connect (requester, libera_send_address);
