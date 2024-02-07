@@ -8,3 +8,5 @@ concentrator_with_evrsupport/bpm.o
 concentrator_with_evrsupport/evr_capt_tests.o
 concentrator_with_evrsupport/sockets.o
 concentrator_with_evrsupport/irq-capture
+tests/zmq_server
+tests/zmq_simple_server.o
