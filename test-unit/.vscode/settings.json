@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "bpm_utils.h": "c",
-        "test_utils.h": "c",
-        "string.h": "c",
-        "time.h": "c"
-    }
-}
