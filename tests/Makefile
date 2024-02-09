@@ -4,14 +4,16 @@ LDFLAGS = -lzmq
 IDIR= ../concentrator_with_evrsupport/include
 OBJFILES = zmq_simple_server.o
 TARGET = zmq_server
+
 DEPS = $(IDIR)/sockets.h
+
 all: $(TARGET)
 
-%.o : .%c
-	$(CC) $(CFLAGS) -c -o $@ $< $(LDFLAGS)
+zmq_simple_server.o : zmq_simple_server.c
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(IDIR) $(LDFLAGS)
 
-$(TARGET): $(OBJFILES) $(DEPS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)
+$(TARGET): $(OBJFILES)
+	$(CC) $(CFLAGS) $(OBJFILES) -o $(TARGET) -I $(IDIR) $(LDFLAGS)
 
 clean:
 	rm -f $(OBJFILES) $(TARGET) *~

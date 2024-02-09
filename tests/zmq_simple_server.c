@@ -9,42 +9,40 @@
     Main(and only) Job: have some connections to listen to Richards.
 */
 
-
 #include <zmq.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
 
-struct Message{
-    char spark_id[5];
-    int payload[16];
-    //int payload_all[128];       //payload for 8 sparks
-};
+/* Message struct consistency */
+#include "sockets.h"
 
 /* argc[1] -- Spark filter in format s(xxx) where xxx is the 
     identifier in IP address*/
-    
+
 int main (int argc, char *argv []){   
-    // Socket to communicate with Richards
-    /* Note on messaging pattern:
-        request and reply doesn't work with our model 
-        of communication.
-        see https://zeromq.org/socket-api/          */
+    /* Socket to communicate with Richards
+         see https://zeromq.org/socket-api/ */    
     void *context = zmq_ctx_new ();
-    void *responder = zmq_socket (context, ZMQ_SUB); 
+    void *subscriber = zmq_socket (context, ZMQ_SUB); 
     
+    /* Bind SUB
+         see https://stackoverflow.com/questions/29752338/zeromq-which-socket-should-bind-on-pubsub-pattern */
+    // int rd = zmq_bind (another_sub, "tcp://*:5555");
+    // /* some error checking */
+    // assert (rd == 0);
+    // perror("zmq_bind to 5555");
     
-   // int rd = zmq_bind (responder, "tcp://enx00e04c680048:5555");
-    /* some error checking */
-   // assert (rd == 0);
-  //  perror("zmq_bind to 5555");
-    
-    int rc = zmq_bind (responder, "tcp://*:9999");  
+    int rc = zmq_bind (subscriber, "tcp://*:9999");
     const char *filter = (argc > 1)? argv [1]: "s201";
-    zmq_setsockopt (responder, ZMQ_SUBSCRIBE, filter, strlen(filter));
+    zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, filter, strlen(filter));
     assert (rc == 0);
     perror("zmq_bind to 9999");
+
+    zmq_pollitem_t items [] = {
+        { subscriber,   0, ZMQ_POLLIN, 0 }
+    };
 
     while (1) {
         /* Create an empty 0MQ message */
@@ -53,23 +51,24 @@ int main (int argc, char *argv []){
         zmq_msg_init (&zmsg);
         //zmq_msg_init_size(&zmsg, sizeof(struct Message));
 
-        /* Receive message and transfer it to our message struct*/
-        zmq_msg_recv(&zmsg, responder, 0);
-        msg = (struct Message *)zmq_msg_data(&zmsg);
+        zmq_poll(items, 1, -1);
+        if (items[0].revents & ZMQ_POLLIN){
+            /* Receive message and transfer it to our message struct*/
+            zmq_msg_recv(&zmsg, subscriber, 0);
+            msg = (struct Message *)zmq_msg_data(&zmsg);
 
-        //const char *user_id = zmq_msg_gets (&zmsg, "Socket-Type");
-
-        printf ("\nSpark %s sent this: \n", msg->spark_id);
-        /* Show me the message now */
-        for(int i=0; i<16; i++){
-            if (i % 16 == 0){
-                printf("\n");
+            printf ("\nSpark %s sent this: \n", msg->spark_id);
+            /* Show me the message now */
+            for(int i=0; i<16; i++){
+                // if (i % 16 == 0){
+                //     printf("\n");
+                // }
+                printf("%d\t", msg->payload[i]);
             }
-            printf("%d\t", msg->payload[i]);
+        
         }
-        /* Release message */
+        /* Release message */        
         zmq_msg_close (&zmsg);
-
         /* Rinse and repeat for now */
     }
 
