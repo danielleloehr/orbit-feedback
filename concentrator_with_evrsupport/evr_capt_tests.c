@@ -53,10 +53,10 @@ struct MrfEgRegs *pEg;
 int              fdEg;
 /******************************/
 
-struct Message{
-		char spark_id[5];
-        int payload[16];
-};
+// struct Message{
+// 		char spark_id[5];
+//         int payload[16];
+// };
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
