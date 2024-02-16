@@ -35,7 +35,7 @@ int main (int argc, char *argv []){
     // perror("zmq_bind to 5555");
     
     int rc = zmq_bind (subscriber, "tcp://*:9999");
-    const char *filter = (argc > 1)? argv [1]: "s201";
+    const char *filter = (argc > 1)? argv [1]: "s202";
     zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, filter, strlen(filter));
     assert (rc == 0);
     perror("zmq_bind to 9999");
