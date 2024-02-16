@@ -70,7 +70,10 @@ struct timespec tic, toc;       // not used right now
 /* Artifial pacemaker to set the rate at which 
     compressed packets should be sent */
 void concentration_pacemaker(int s){
-	EvgSendSWEvent(pEg, 1);
+    #if EVR_EVM_PRESENT 
+	    EvgSendSWEvent(pEg, 1);
+    #endif
+    
 	send_data = 1;
 	print_debug_info("DEBUG: Alarm!.\n");
 	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
