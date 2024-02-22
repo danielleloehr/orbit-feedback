@@ -2,7 +2,7 @@
 
 /* Initiliases the book keeper entity */
 void init_bookkeeper(struct bookKeeper *book_keeper) {
-    /* Copy from hard-coded address book */
+    /* Copy from hard-coded address book */    
     for(int i=0; i<NO_SPARKS; i++){
         book_keeper->count_per_libera[i] = 0;   
         book_keeper->buffer_index[i] = 0; 

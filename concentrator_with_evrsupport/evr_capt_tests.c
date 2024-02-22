@@ -87,6 +87,7 @@ void concentration_pacemaker(int s){
 }
 
 //-------------------------------------------------------------------------------------------------
+#ifdef EVR_IRQ
 /* This will stop the wave when interrupt thread handles an IRQ */
 void signal_ready_to_send(int signum){
 	print_debug_info("DEBUG: Concentrate and send signal in!.\n");
@@ -152,6 +153,7 @@ void *irqsetup(){
     /* Never reach */
     pthread_exit(NULL);
 }
+#endif
 //-------------------------------------------------------------------------------------------------
 
 // depends on queue, I am not passing it... 
@@ -162,7 +164,7 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
     long long payload_sums[PAYLOAD_FIELDS];                              /*TODO*/
     int compact_payload[PAYLOAD_FIELDS];
 
-    for(int i=0; i < 1; i++){	// not all sparks  /* CAREFUL*/ 
+    for(int i=0; i < NO_SPARKS; i++){	// not all sparks  /* CAREFUL*/ 
         memset(payload_sums, 0 , sizeof(payload_sums));
       
         //int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
@@ -194,8 +196,8 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
         //sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
         memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%d", "s", 202);
-	// this should display the "last xxx" of the IP address
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%d", "s", i);
+	    // this should display the "last xxx" of the IP address according to the book keeper!!
         zmq_send(requester, &msg, sizeof(struct Message), 0);  //btw this works I am just trying to figure out why alarm stops working
 
         // Clean up
@@ -226,9 +228,9 @@ void display_current_config(void) {
 
     printf("\n");
 
-    printf("Packet Collection Parameters\n");
-    printf("Estimated Packet Traffic per Box: %d pps\n", PACKET_MAX);
-    printf("Capture Duration: %d\n", DURATION);
+    // printf("Packet Collection Parameters\n");
+    // printf("Estimated Packet Traffic per Box: %d pps\n", PACKET_MAX);
+    // printf("Capture Duration: %d\n", DURATION);
     printf("Number of Connected Sparks: %d\n", NO_SPARKS);
     printf("\n");
 
@@ -307,11 +309,12 @@ int main(){
 
 	/* Single Spark experiment */
 	/* Connect to one listening socket */
-	char libera_send_address[27];
-	int sparkport = 9999;   // in case you would like to send to different ports       
-	snprintf(libera_send_address, sizeof(libera_send_address), "%s%s%s%d", "tcp://", LOCAL_ADDR,":", sparkport);	
+	//char libera_send_address[27];
+	//int sparkport = 9999;   // in case you would like to send to different ports       
+	//snprintf(libera_send_address, sizeof(libera_send_address), "%s%s%s%d", "tcp://", LOCAL_ADDR,":", sparkport);	
 
-    zmq_connect (requester, libera_send_address);
+    //zmq_connect (requester, libera_send_address);
+    zmq_bind(requester, "tcp://*:9999");
 
     /********************************************/
     /* Address Book                             */ 
@@ -384,8 +387,8 @@ int main(){
                     if(packet.id == book_keeper.box_id[i]){             // Get the box ID                   
                         book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
 
-                        // Check the buffer limits
-                        if (book_keeper.buffer_index[i] < MAX_BUFF_SIZE){
+                        // Check the buffer limits          <-- Check this again
+                        if (book_keeper.count_per_libera[i] < MAX_BUFF_SIZE){
                             queue[i][book_keeper.buffer_index[i]] = packet ;
                             book_keeper.buffer_index[i]++;
                         }else {
