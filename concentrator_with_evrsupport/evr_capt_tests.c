@@ -15,8 +15,8 @@
 #include "bpm.h"
 #include "sockets.h"
  
-#include "erapi.h" 
-#include "egapi.h"
+// #include "erapi.h" 
+// #include "egapi.h"
 
 #include <zmq.h>
 #include<sys/wait.h>
