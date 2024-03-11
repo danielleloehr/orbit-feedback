@@ -1,10 +1,12 @@
 /*
  fa-capture under test
-   VERSION 00.04.0  -- Richards version 
+   VERSION 00.05.0  -- Richards version 
 
    Main EVR test version
+   - Comment everything dependent on Jukka's API 
+   - Comment all irrelevant paramters too
    
-   Open issues and TODOs
+   Open issues and TODOs (old not controlled)
    - signal, EINTR
    - array overflows
 */
@@ -25,8 +27,10 @@
 #define REGISTER 		    1
 #define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
-#define ALARM_USEC       	6666.66  //6666.66 // 1 second)
-#define EVR_EVM_PRESENT     1
+#define EVR_IRQ             1
+// #define ALARM_USEC       	6666.66  //6666.66 // 1 second)
+// #define EVR_EVM_PRESENT     1
+// #define CAPTURE             1
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
@@ -39,19 +43,21 @@ static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL *
 static char LOCAL_ADDR[16] = "192.168.2.200"; 
 static int LOCAL_PORT = 2049;                           // different than 2048
 
-/******************************/
-/* EVR */
-struct MrfErRegs *pEr;
-int              fdEr;
-/* Control variable for the main while loop */
 static volatile int send_data;
-/******************************/
+int fd;
 
-/******************************/
-/* EVG */
-struct MrfEgRegs *pEg;
-int              fdEg;
-/******************************/
+// /******************************/
+// /* EVR */
+// struct MrfErRegs *pEr;
+// int              fdEr;
+// /* Control variable for the main while loop */
+// /******************************/
+
+// /******************************/
+// /* EVG */
+// struct MrfEgRegs *pEg;
+// int              fdEg;
+// /******************************/
 
 // struct Message{
 // 		char spark_id[5];
@@ -69,25 +75,26 @@ struct timespec tic, toc;       // not used right now
 
 /* Artifial pacemaker to set the rate at which 
     compressed packets should be sent */
-void concentration_pacemaker(int s){
-    #if EVR_EVM_PRESENT 
-	    EvgSendSWEvent(pEg, 1);
-    #endif
+// void concentration_pacemaker(int s){
+//     #if EVR_EVM_PRESENT 
+// 	    EvgSendSWEvent(pEg, 1);
+//     #endif
     
-	send_data = 1;
-	print_debug_info("DEBUG: Alarm!.\n");
-	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
-	GLOBAL_PACKET_COUNTER = 0;
-	clock_gettime(CLOCK_MONOTONIC, &tic);
-	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
+// 	send_data = 1;
+// 	print_debug_info("DEBUG: Alarm!.\n");
+// 	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
+// 	GLOBAL_PACKET_COUNTER = 0;
+// 	clock_gettime(CLOCK_MONOTONIC, &tic);
+// 	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
 	
-    /* Repeatedly set the alarm for the next wave */
-	ualarm(ALARM_USEC, 0);		// use 1000000 -1 
-	signal(SIGALRM, concentration_pacemaker);
-}
+//     /* Repeatedly set the alarm for the next wave */
+// 	ualarm(ALARM_USEC, 0);		// use 1000000 -1 
+// 	signal(SIGALRM, concentration_pacemaker);
+// }
 
 //-------------------------------------------------------------------------------------------------
-#ifdef EVR_IRQ
+// TODO: please remove this once the test passes 
+#ifdef EVR_API_IRQ
 /* This will stop the wave when interrupt thread handles an IRQ */
 void signal_ready_to_send(int signum){
 	print_debug_info("DEBUG: Concentrate and send signal in!.\n");
@@ -155,6 +162,18 @@ void *irqsetup(){
 }
 #endif
 //-------------------------------------------------------------------------------------------------
+/* Blocking way to do it */
+void uio_read(){
+    select_affinity(CPU_CORE);
+    int irq_count;
+    while(1){
+        if(read(fd, &irq_count, 4) == 4){
+           print_debug_info("DEBUG: IRQ received. Packet count : %d\n", GLOBAL_PACKET_COUNTER);
+           send_data = 1;
+        }
+    }
+}
+
 
 // depends on queue, I am not passing it... 
 void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server, void *requester, struct Message msg){
@@ -182,8 +201,8 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
 
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-            if(payload_sums[ind] == 0){
-                compact_payload[ind] = (int) payload_sums[ind];
+            if(payload_sums[ind] == 0){                                 // CAREFUL
+                compact_payload[ind] = (int) payload_sums[ind];         // CAREFUL timestamps are divided !!!!
             }else{
                 compact_payload[ind] = (int) (payload_sums[ind]/book_keeper->count_per_libera[i]-1);
             }
@@ -325,17 +344,25 @@ int main(){
     /********************************************/
     /* Open EVR device                          */ 
     /********************************************/
-    #if EVR_EVM_PRESENT 
-        fdEr = EvrOpen(&pEr, "/dev/era3");
-        if (fdEr == -1){
-            return errno;
-        } 
 
-        fdEg = EvgOpen(&pEg, "/dev/ega3");
-        if (fdEg == -1){
-            return errno;
-        }
-    #endif
+    fd = open("/dev/uio0", O_RDWR);
+
+    if (fd < 0) {
+        perror("uio open:");
+        return errno;
+    }
+
+    // #if EVR_EVM_PRESENT 
+    //     fdEr = EvrOpen(&pEr, "/dev/era3");
+    //     if (fdEr == -1){
+    //         return errno;
+    //     } 
+
+    //     fdEg = EvgOpen(&pEg, "/dev/ega3");
+    //     if (fdEg == -1){
+    //         return errno;
+    //     }
+    // #endif
 
     /********************************************/
     /* Thread Control                           */
@@ -350,13 +377,13 @@ int main(){
 
     /* Register the signal thread uses to communicate with main loop */
 	//signal(SIGUSR1, signal_ready_to_send);                      // reintroduce signal later. much cleaner
-    //print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
+    print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
     /* Start thread for interrupt handling */   
-    //pthread_create(&irq_thread_id, NULL, irqsetup, NULL);
+    pthread_create(&irq_thread_id, NULL, uio_read, NULL);
     
     GLOBAL_PACKET_COUNTER = 0;
-    ualarm(ALARM_USEC, 0);
-	signal(SIGALRM, concentration_pacemaker);
+    // ualarm(ALARM_USEC, 0);
+	// signal(SIGALRM, concentration_pacemaker);
 
     while(1){
         if(send_data){

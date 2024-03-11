@@ -25,7 +25,7 @@
 #define TIME_LIMIT_USEC 100     /* Stopwatch */
 #define DEBUG_ON        1
 
-#ifdef DEBUG_ON
+#if DEBUG_ON
     #define print_debug_info(format, ...)  fprintf (stderr, format, ##__VA_ARGS__)
 #endif
 
