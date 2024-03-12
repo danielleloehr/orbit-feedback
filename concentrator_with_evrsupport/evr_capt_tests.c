@@ -1,11 +1,7 @@
 /*
  fa-capture under test
-   VERSION 00.05.0  -- Richards version 
+   VERSION 00.05.1  -- Richards version with mrfioc2 support
 
-   Main EVR test version
-   - Comment everything dependent on Jukka's API 
-   - Comment all irrelevant paramters too
-   
    Open issues and TODOs (old not controlled)
    - signal, EINTR
    - array overflows
@@ -15,9 +11,6 @@
 #include "bpm.h"
 #include "sockets.h"
  
-// #include "erapi.h" 
-// #include "egapi.h"
-
 #include <zmq.h>
 #include<sys/wait.h>
 
@@ -27,42 +20,26 @@
 #define REGISTER 		    1
 #define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
+
 #define EVR_IRQ             1
-// #define ALARM_USEC       	6666.66  //6666.66 // 1 second)
-// #define EVR_EVM_PRESENT     1
-// #define CAPTURE             1
+#define SOFT_IRQ            0
+#define ALARM_USEC       	6666.66
+
+#define TESTMODE            0
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
-#define MAX_BUFF_SIZE 20000     // for one second more than enough
+#define MAX_BUFF_SIZE 20000     
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL */
 
 /* Main server information                          
    Forward compressed packets to this address       */
 /* TODO: replace by ZeroMQ */
 static char LOCAL_ADDR[16] = "192.168.2.200"; 
-static int LOCAL_PORT = 2049;                           // different than 2048
+static int LOCAL_PORT = 2049;               /* needs to be different than 2048 */
 
 static volatile int send_data;
-int fd;
-
-// /******************************/
-// /* EVR */
-// struct MrfErRegs *pEr;
-// int              fdEr;
-// /* Control variable for the main while loop */
-// /******************************/
-
-// /******************************/
-// /* EVG */
-// struct MrfEgRegs *pEg;
-// int              fdEg;
-// /******************************/
-
-// struct Message{
-// 		char spark_id[5];
-//         int payload[16];
-// };
+int evr_fd;
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
@@ -73,24 +50,26 @@ static int GLOBAL_PACKET_COUNTER;
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
 
-/* Artifial pacemaker to set the rate at which 
-    compressed packets should be sent */
-// void concentration_pacemaker(int s){
-//     #if EVR_EVM_PRESENT 
-// 	    EvgSendSWEvent(pEg, 1);
-//     #endif
-    
-// 	send_data = 1;
-// 	print_debug_info("DEBUG: Alarm!.\n");
-// 	print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
-// 	GLOBAL_PACKET_COUNTER = 0;
-// 	clock_gettime(CLOCK_MONOTONIC, &tic);
-// 	print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
-	
-//     /* Repeatedly set the alarm for the next wave */
-// 	ualarm(ALARM_USEC, 0);		// use 1000000 -1 
-// 	signal(SIGALRM, concentration_pacemaker);
-// }
+#if SOFT_IRQ
+    /* Artifial pacemaker to set the rate at which 
+        compressed packets should be sent */
+    void concentration_pacemaker(int s){
+        #if EVR_EVM_PRESENT 
+            EvgSendSWEvent(pEg, 1);
+        #endif
+        
+        send_data = 1;
+        print_debug_info("DEBUG: Alarm!.\n");
+        print_debug_info("DEBUG: Counter in alarm handler : %d.\n", GLOBAL_PACKET_COUNTER);
+        GLOBAL_PACKET_COUNTER = 0;
+        clock_gettime(CLOCK_MONOTONIC, &tic);
+        print_debug_info("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
+        
+        /* Repeatedly set the alarm for the next wave */
+        ualarm(ALARM_USEC, 0);		// use 1000000 -1 
+        signal(SIGALRM, concentration_pacemaker);
+    }
+#endif
 
 //-------------------------------------------------------------------------------------------------
 // TODO: please remove this once the test passes 
@@ -103,79 +82,22 @@ void signal_ready_to_send(int signum){
     print_debug_info("DEBUG: Counter in signal handler : %d.\n", GLOBAL_PACKET_COUNTER);
     send_data = 1;
 }
-
-void evr_irq_handler(int param){
-    int flags;
-    flags = EvrGetIrqFlags(pEr);
-    print_debug_info("DEBUG: Counter in interrupt handler : %d.\n", GLOBAL_PACKET_COUNTER);
-
-    if (flags & (1 << C_EVR_IRQFLAG_PULSE)){
-        clock_gettime(CLOCK_MONOTONIC, &tic); 
-        print_debug_info("%.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
-        //raise(SIGUSR1);
-        print_debug_info("Pulse IRQ\n");
-        EvrClearIrqFlags(pEr, (1 << C_EVR_IRQFLAG_PULSE));  	
-    }
-    GLOBAL_PACKET_COUNTER = 0;
- 	EvrIrqHandled(fdEr);
-
-}
-
-
-void *irqsetup(){
-    select_affinity(CPU_CORE);
-    EvrEnable(pEr, 1);
-    if (!EvrGetEnable(pEr))
-        {
-        printf("Could not enable EVR!\n");
-        //return -1;  // Won't return an error code !!!
-        }
-    
-    EvrSetTargetDelay(pEr, 0x01000000);
-    EvrDCEnable(pEr, 1);
-    
-    EvrGetViolation(pEr, 1);
-
-    /* Build configuration for EVR map RAMS */
-
-    EvrSetLedEvent(pEr, 0, 0x02, 1);
-    /* Map event 0x01 to trigger pulse generator 0 */
-    EvrSetPulseMap(pEr, 0, 0x02, 0, -1, -1);
-    EvrSetPulseParams(pEr, 0, 1, 100, 100);
-    EvrSetPulseProperties(pEr, 0, 0, 0, 0, 1, 1);
-    EvrSetUnivOutMap(pEr, 0, 0x3f00);
-    EvrSetPulseIrqMap(pEr, 0x3f00);
-
-    EvrSetExtEvent(pEr, 0, 0x01, 1, 0);
-
-    EvrMapRamEnable(pEr, 0, 1);
-
-    EvrOutputEnable(pEr, 1);
-
-    EvrIrqAssignHandler(pEr, fdEr, &evr_irq_handler);
-    EvrIrqEnable(pEr, EVR_IRQ_MASTER_ENABLE | EVR_IRQFLAG_PULSE);
-
-    //while(1);  // "wait for IRQs in the background"
-    wait(NULL);     // be nice to CPU
-    /* Never reach */
-    pthread_exit(NULL);
-}
 #endif
 //-------------------------------------------------------------------------------------------------
-/* Blocking way to do it */
+
+/* Blocking read that doesn't harm anyone yet */
 void uio_read(){
     select_affinity(CPU_CORE);
     int irq_count;
     while(1){
-        if(read(fd, &irq_count, 4) == 4){
+        if(read(evr_fd, &irq_count, 4) == 4){
            print_debug_info("DEBUG: IRQ received. Packet count : %d\n", GLOBAL_PACKET_COUNTER);
            send_data = 1;
         }
     }
 }
 
-
-// depends on queue, I am not passing it... 
+/* Queue must be Global */
 void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server, void *requester, struct Message msg){
     /********************************************/
     /* Payload Compression                      */
@@ -192,19 +114,24 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
         // Assume buffer didn't "overflow" and always start from the beginning.
         // there is a mechanism for overflow but nothing for data integrity
         for(int curr_ind = 0; curr_ind < book_keeper->count_per_libera[i]; curr_ind++){ 
-            for(int payload_ind = 0; payload_ind< PAYLOAD_FIELDS; payload_ind++){
-                payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
-                //buffer_start++;
+            for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
+                if (payload_ind == 8 || payload_ind == 9 || payload_ind == 15){
+                    payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];         //overwrite to the last packet
+                }else{
+                    payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
+                    //buffer_start++;
+                }
+
             }                           
         }
 		//print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
 
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-            if(payload_sums[ind] == 0){                                 // CAREFUL
-                compact_payload[ind] = (int) payload_sums[ind];         // CAREFUL timestamps are divided !!!!
+            if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){                       // TODO bitmask this..
+                compact_payload[ind] = (int) payload_sums[ind]; 
             }else{
-                compact_payload[ind] = (int) (payload_sums[ind]/book_keeper->count_per_libera[i]-1);
+                compact_payload[ind] = (int) (payload_sums[ind]/book_keeper->count_per_libera[i]);                
             }
         }
 
@@ -230,12 +157,7 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
 void display_current_config(void) {
     printf("---------------------------------------\n");
     printf("Current Capture Configuration\n");
-    #if IRQ_CNTRL_TEST 
-        printf("Interrupt Control mode: "); 
-        fancy_print(IRQ_CNTRL_TEST);
-        printf("%s\n", "\033[91mPlease make sure all other options are deactivated!\033[0m"); 
-    #endif
-
+    
     printf("Latency Performance Recording: "); 
     fancy_print(LATENCY_PERF);
 
@@ -245,11 +167,14 @@ void display_current_config(void) {
     printf("Packet Registery: ");
     fancy_print(REGISTER);
 
+    #if TESTMODE
+        printf("Packet Collection Parameters\n");
+        printf("Estimated Packet Traffic per Box: %d pps\n", PACKET_MAX);
+        printf("Capture Duration: %d\n", DURATION);
+    #endif
+
     printf("\n");
 
-    // printf("Packet Collection Parameters\n");
-    // printf("Estimated Packet Traffic per Box: %d pps\n", PACKET_MAX);
-    // printf("Capture Duration: %d\n", DURATION);
     printf("Number of Connected Sparks: %d\n", NO_SPARKS);
     printf("\n");
 
@@ -257,6 +182,16 @@ void display_current_config(void) {
     printf("Server IP: %s\n", IP_ADDR);
     printf("Server Port: %d\n", PORT);
 
+    if(EVR_IRQ && SOFT_IRQ){
+        printf("%s\n", "\033[91mPlease choose one interrupt control option!\033[0m"); 
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Interrupt Control Mode: ");
+    if(EVR_IRQ) printf("\033[92m\033[92mEVR_IRQ\033[0m");
+    if(SOFT_IRQ) printf("\033[92m\033[92mSOFT_IRQ\033[0m");
+    printf("\n");
+    
     printf("CPU core selection for multithreading: CPU %d\n", CPU_CORE);
 
     printf("---------------------------------------\n");
@@ -270,13 +205,32 @@ void display_current_config(void) {
 
 int main(){    
 
-    display_current_config();   
+    display_current_config(); 
+
+    pthread_t irq_thread_id;
+    GLOBAL_PACKET_COUNTER = 0;
+    
+    /* TEST MODE */
+    #if TESTMODE
+        int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
+    #endif
 
     /********************************************/
-    /* Packet Collection Parameters             */
+    /* Packet Collection                        */
     /********************************************/
-    //int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
     static struct packetRecord packet;   
+    struct bookKeeper book_keeper;
+    init_bookkeeper(&book_keeper);
+    
+    /********************************************/
+    /* Open EVR device                          */ 
+    /********************************************/
+    evr_fd = open("/dev/uio0", O_RDWR);
+
+    if (evr_fd < 0) {
+        perror("uio open:");
+        return errno;
+    }
 
     /********************************************/
     /* Socket for Reception to collect original */
@@ -302,6 +256,7 @@ int main(){
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
 
+
     /********************************************/                  
     /* Socket to collect concentrated packets   */
     /********************************************/
@@ -317,9 +272,10 @@ int main(){
     transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
     transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
     transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
+  
 
     /********************************************/
-    /* ZeroMQ PUSH/PULL messaging line */
+    /* ZeroMQ PUB/SUB                           */
     /********************************************/
     struct Message msg;
 
@@ -335,55 +291,21 @@ int main(){
     //zmq_connect (requester, libera_send_address);
     zmq_bind(requester, "tcp://*:9999");
 
-    /********************************************/
-    /* Address Book                             */ 
-    /********************************************/
-    struct bookKeeper book_keeper;
-    init_bookkeeper(&book_keeper);
-    
-    /********************************************/
-    /* Open EVR device                          */ 
-    /********************************************/
-
-    fd = open("/dev/uio0", O_RDWR);
-
-    if (fd < 0) {
-        perror("uio open:");
-        return errno;
-    }
-
-    // #if EVR_EVM_PRESENT 
-    //     fdEr = EvrOpen(&pEr, "/dev/era3");
-    //     if (fdEr == -1){
-    //         return errno;
-    //     } 
-
-    //     fdEg = EvgOpen(&pEg, "/dev/ega3");
-    //     if (fdEg == -1){
-    //         return errno;
-    //     }
-    // #endif
-
-    /********************************************/
-    /* Thread Control                           */
-    /********************************************/	
-    pthread_t irq_thread_id;
-
+    /*******************************************************************************/
     /* MAIN */
     #if LATENCY_PERF
         /* Print this to make our lives bit easier when we later parse with pandas */
         printf("sec, nanosec\n");
     #endif
-
-    /* Register the signal thread uses to communicate with main loop */
-	//signal(SIGUSR1, signal_ready_to_send);                      // reintroduce signal later. much cleaner
+   
+    /* Start thread for interrupt handling */ 
     print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
-    /* Start thread for interrupt handling */   
     pthread_create(&irq_thread_id, NULL, uio_read, NULL);
     
-    GLOBAL_PACKET_COUNTER = 0;
-    // ualarm(ALARM_USEC, 0);
-	// signal(SIGALRM, concentration_pacemaker);
+    #if(SOFT_IRQ)
+        ualarm(ALARM_USEC, 0);
+	    signal(SIGALRM, concentration_pacemaker);
+    #endif
 
     while(1){
         if(send_data){
@@ -414,7 +336,7 @@ int main(){
                     if(packet.id == book_keeper.box_id[i]){             // Get the box ID                   
                         book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
 
-                        // Check the buffer limits          <-- Check this again
+                        // Check the buffer limits                          <-- Check this again
                         if (book_keeper.count_per_libera[i] < MAX_BUFF_SIZE){
                             queue[i][book_keeper.buffer_index[i]] = packet ;
                             book_keeper.buffer_index[i]++;
@@ -426,8 +348,6 @@ int main(){
                 }
 
             #endif   
-
-         
             
         }else{
             perror("recvfrom()");
