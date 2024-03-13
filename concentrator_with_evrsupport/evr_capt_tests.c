@@ -2,6 +2,9 @@
  fa-capture under test
    VERSION 00.05.1  -- Richards version with mrfioc2 support
 
+TODO
+-rename spark_bookkeeper 
+
    Open issues and TODOs (old not controlled)
    - signal, EINTR
    - array overflows
@@ -89,11 +92,11 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
     for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
        
-        //int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
-        //printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
-				
-        // Assume buffer didn't "overflow" and always start from the beginning.
-        // there is a mechanism for overflow but nothing for data integrity
+        int buffer_start = spark_book_keeper->count_per_libera[i] - spark_book_keeper->buffer_index[i];
+        printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
+		
+        // if buffer and count are not the same, there was an overflow. 
+        // then take the latest packets and compress those 
         for(int curr_ind = 0; curr_ind < spark_book_keeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
                 // Don't sum indices 8(LTM_h), 9(LTM_h) and 15(status), just use the fields of the latest packet
@@ -131,6 +134,8 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
         spark_book_keeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
         // Always overwrite the buffer. 
     }
+    
+    sleep(10);
 }
 
 
@@ -289,9 +294,11 @@ int main(){
                     if(packet.id == spark_book_keeper.box_id[i]){             // Get the box ID                   
                         spark_book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
 
-                        // Check the buffer limits                              <-- Check this again
-                        if (spark_book_keeper.count_per_libera[i] < MAX_BUFF_SIZE-1){
+                        // Check the buffer limits 
+                        // maximum buffer size is deducted by 1. (0 indexing for buffer, 1 indexing for count!)                                 
+                        if (spark_book_keeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_book_keeper.count_per_libera[i]);
+                            print_debug_info("DEBUG: current buffer index for this Spark is %d\n", spark_book_keeper.buffer_index[i]);
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;
                             spark_book_keeper.buffer_index[i]++;
                         }else {
@@ -299,7 +306,10 @@ int main(){
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;         // then register the packet
                         }
                     }
+                    printf("Test\n");
+                    if (spark_book_keeper.count_per_libera[i] == 1000) send_data = 2;
                 }
+                
 
             #endif   
             
