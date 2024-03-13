@@ -49,7 +49,7 @@ static int PORT = 2048;
 static char ADDRESS_BOOK[32][16] = { "1.1.1.202", 	//32
                                      "1.1.1.201", 
                                      "1.1.1.200",	
-                                     "1.1.1.199",
+               TST_                      "1.1.1.199",
                                      "1.1.1.198",
                                      "1.1.1.197",
                                      "1.1.1.196",
@@ -84,7 +84,7 @@ static char ADDRESS_BOOK[32][16] = { "1.1.1.202", 	//32
  * GLOBAL FUNCTION PROTOTYPES
  ************************************/
 /* Initiliases the book keeper entity */
-void init_bookkeeper(struct bookKeeper *book_keeper) {
+void TST_init_bookkeeper(struct bookKeeper *book_keeper) {
     /* Copy from hard-coded address book */
     for(int i=0; i<NO_SPARKS; i++){
         book_keeper->count_per_libera[i] = 0;   
@@ -92,7 +92,7 @@ void init_bookkeeper(struct bookKeeper *book_keeper) {
     } 
 }
 
-int prepare_socket(struct sockaddr_in server) {
+int TST_prepare_socket(struct sockaddr_in server) {
     int socket_desc;
 
     /* Create a datagram socket*/
@@ -115,7 +115,7 @@ int prepare_socket(struct sockaddr_in server) {
     return socket_desc;
 }
 
-void print_addressbook(struct bookKeeper *book_keeper) {
+void TST_print_addressbook(struct bookKeeper *book_keeper) {
     printf("Address book: \n");
     for(int i = 0; i< NO_SPARKS; i++){
         printf("%d : Box IP: %u\t No. of Packets: %d\n" , 
@@ -123,7 +123,7 @@ void print_addressbook(struct bookKeeper *book_keeper) {
     }
 }
 
-void print_payload(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
+void TST_print_payload(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
                    long int Q, long int X, long int Y) {
     printf("SPARK %d \t:", (32-n));
     printf("vA %ld\t vB %ld\t vC %ld\t vD %ld\t SUM %ld\t Q %ld\t X %ld\t  Y %ld\n", vA/30, vB/30, vC/30, vD/30, SUM/30, Q/30, X/30, Y/30);					
