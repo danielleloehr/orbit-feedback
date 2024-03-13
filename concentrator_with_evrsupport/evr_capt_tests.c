@@ -206,12 +206,14 @@ int main(){
     /********************************************/
     /* Open EVR device                          */ 
     /********************************************/
-    evr_fd = open("/dev/uio0", O_RDWR);
+    #if(EVR_IRQ)
+        evr_fd = open("/dev/uio0", O_RDWR);
 
-    if (evr_fd < 0) {
-        perror("uio open:");
-        return errno;
-    }
+        if (evr_fd < 0) {
+            perror("uio open:");
+            return errno;
+        }
+    #endif
 
     /********************************************/
     /* Socket for Reception to collect from     */
