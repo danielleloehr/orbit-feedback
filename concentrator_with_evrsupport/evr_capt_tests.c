@@ -289,6 +289,7 @@ int main(){
 
                         // Check the buffer limits                              <-- Check this again
                         if (spark_book_keeper.count_per_libera[i] < MAX_BUFF_SIZE-1){
+                            print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_book_keeper.count_per_libera[i]);
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;
                             spark_book_keeper.buffer_index[i]++;
                         }else {
