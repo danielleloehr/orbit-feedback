@@ -125,7 +125,7 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
         #endif
 
         memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_book_keeper->box_id[i]));  //i+1
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_book_keeper->box_id[i], 1));  //i+1
         print_debug_info("DEBUG: %s\n", msg.spark_id);
         zmq_send(publisher, &msg, sizeof(struct Message), 0); 
 
@@ -306,7 +306,6 @@ int main(){
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;         // then register the packet
                         }
                     }
-                    printf("Test\n");
                     if (spark_book_keeper.count_per_libera[i] == 1000) send_data = 2;
                 }
                 

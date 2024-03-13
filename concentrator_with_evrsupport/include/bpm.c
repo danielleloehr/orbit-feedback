@@ -12,19 +12,29 @@ void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]) {
 }
 
 
-char *get_ipaddr_printable(int ip){
-    struct in_addr ip_addr;
-    ip_addr.s_addr = ip;
-
-    return inet_ntoa(ip_addr);
+char *get_ipaddr_printable(int ip, int lastbyte){
+    static char ipaddress[16];
+    unsigned char bytes[4];
+    bytes[0] = ip & 0xFF;
+    bytes[1] = (ip >> 8) & 0xFF;
+    bytes[2] = (ip >> 16) & 0xFF;
+    bytes[3] = (ip >> 24) & 0xFF;   
+   
+    if(lastbyte){
+        snprintf(ipaddress, sizeof(ipaddress), "%d", bytes[3]);
+    }else{
+        snprintf(ipaddress, sizeof(ipaddress), "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
+    }    
+    return ipaddress;    
 }
+
 
 
 void print_addressbook(struct bookKeeper *book_keeper) {
     printf("Address book: \n");  
     for(int i = 0; i< NO_SPARKS; i++){ 
         printf("%d : Box IP: %s\t No. of Packets: %d\n" , 
-            i, get_ipaddr_printable(book_keeper->box_id[i]), (book_keeper->count_per_libera[i]));
+            i, get_ipaddr_printable(book_keeper->box_id[i], 0), (book_keeper->count_per_libera[i]));
     }
     printf("\n");
 }

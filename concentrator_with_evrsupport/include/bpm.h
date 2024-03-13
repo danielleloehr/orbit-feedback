@@ -75,7 +75,7 @@ static char *example_addressbook [32] = {
  * FUNCTION PROTOTYPES
  ************************************/
 void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]);
-char *get_ipaddr_printable(int ip);
+char *get_ipaddr_printable(int ip, int lastbyte);
 void print_addressbook(struct bookKeeper *book_keeper);
 void print_payload(int payload[PAYLOAD_FIELDS]);
 void print_payload_test(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
