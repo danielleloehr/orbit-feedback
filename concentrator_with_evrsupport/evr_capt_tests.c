@@ -297,10 +297,12 @@ int main(){
                         // Check the buffer limits 
                         // maximum buffer size is deducted by 1. (0 indexing for buffer, 1 indexing for count!)                                 
                         if (spark_book_keeper.buffer_index[i] < MAX_BUFF_SIZE-1){
-                            print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_book_keeper.count_per_libera[i]);
-                            print_debug_info("DEBUG: current buffer index for this Spark is %d\n", spark_book_keeper.buffer_index[i]);
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;
                             spark_book_keeper.buffer_index[i]++;
+
+                            print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_book_keeper.count_per_libera[i]);
+                            print_debug_info("DEBUG: current buffer index for this Spark is %d\n", spark_book_keeper.buffer_index[i]);
+
                         }else {
                             spark_book_keeper.buffer_index[i] = 0;                         // go to beginning
                             queue[i][spark_book_keeper.buffer_index[i]] = packet ;         // then register the packet
