@@ -24,7 +24,7 @@ TODO
 #define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
 
-#define EVR_IRQ             1
+#define EVR_IRQ             0
 #define SOFT_IRQ            0
 #define ALARM_USEC       	6666.66
 
@@ -82,7 +82,7 @@ void uio_read(){
 }
 
 /* Queue must be Global */
-void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, struct Message msg){
+void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, struct Message msg){
     /********************************************/
     /* Payload Compression                      */
     /********************************************/
@@ -92,23 +92,26 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
     for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
        
-        int buffer_start = spark_book_keeper->count_per_libera[i] - spark_book_keeper->buffer_index[i];
-        printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
+        int buffer_overflow = spark_bookkeeper->count_per_libera[i] - spark_bookkeeper->buffer_index[i];
+        print_debug_info("DEBUG: buffer overflowed by %d \n", buffer_overflow);
+
+        // Overwrite the count value if there was an overflow to regard only the latest packets in the full queue
+        if(buffer_overflow != 0){
+            spark_bookkeeper->count_per_libera[i] = spark_bookkeeper->buffer_index[i];
+            print_debug_info("DEBUG: new count for Spark %s is %d \n", 
+                                get_ipaddr_printable(spark_bookkeeper->box_id[i], 1), spark_bookkeeper->count_per_libera[i]);
+        }
 		
-        // if buffer and count are not the same, there was an overflow. 
-        // then take the latest packets and compress those 
-        for(int curr_ind = 0; curr_ind < spark_book_keeper->count_per_libera[i]; curr_ind++){ 
+        for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
                 // Don't sum indices 8(LTM_h), 9(LTM_h) and 15(status), just use the fields of the latest packet
                 if (payload_ind == 8 || payload_ind == 9 || payload_ind == 15){
                     payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];      
                 }else{
                     payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
-                    //buffer_start++;
                 }
             }                           
-        }
-		//print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
+        }		
 
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
@@ -116,7 +119,7 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
             if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){ 
                 compact_payload[ind] = (int) payload_sums[ind]; 
             }else{
-                compact_payload[ind] = (int) (payload_sums[ind]/spark_book_keeper->count_per_libera[i]);                
+                compact_payload[ind] = (int) (payload_sums[ind]/spark_bookkeeper->count_per_libera[i]);                
             }
         }
 
@@ -125,13 +128,13 @@ void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, st
         #endif
 
         memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_book_keeper->box_id[i], 1));  //i+1
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_bookkeeper->box_id[i], 1));  //i+1
         print_debug_info("DEBUG: %s\n", msg.spark_id);
         zmq_send(publisher, &msg, sizeof(struct Message), 0); 
 
         // Clean up
-        spark_book_keeper->count_per_libera[i] = 0;
-        spark_book_keeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
+        spark_bookkeeper->count_per_libera[i] = 0;
+        spark_bookkeeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
         // Always overwrite the buffer. 
     }
     
@@ -196,9 +199,9 @@ int main(){
     /* Packet Collection                        */
     /********************************************/
     static struct packetRecord packet;   
-    struct bookKeeper spark_book_keeper;
-    init_bookkeeper(&spark_book_keeper, example_addressbook);
-    print_addressbook(&spark_book_keeper);
+    struct bookKeeper spark_bookkeeper;
+    init_bookkeeper(&spark_bookkeeper, example_addressbook);
+    print_addressbook(&spark_bookkeeper);
 
     /* TEST MODE */
     #if TESTMODE
@@ -267,7 +270,7 @@ int main(){
 
     while(1){
         if(send_data == 2){
-            compress_and_send(&spark_book_keeper, publisher, msg);
+            compress_and_send(&spark_bookkeeper, publisher, msg);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
@@ -291,24 +294,24 @@ int main(){
 
                 // Semi-cyclic registeration
                 for(int i=0; i<NO_SPARKS; i++){
-                    if(packet.id == spark_book_keeper.box_id[i]){             // Get the box ID                   
-                        spark_book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
+                    if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
+                        spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
 
                         // Check the buffer limits 
                         // maximum buffer size is deducted by 1. (0 indexing for buffer, 1 indexing for count!)                                 
-                        if (spark_book_keeper.buffer_index[i] < MAX_BUFF_SIZE-1){
-                            queue[i][spark_book_keeper.buffer_index[i]] = packet ;
-                            spark_book_keeper.buffer_index[i]++;
+                        if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
+                            queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
+                            spark_bookkeeper.buffer_index[i]++;
 
-                            print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_book_keeper.count_per_libera[i]);
-                            print_debug_info("DEBUG: current buffer index for this Spark is %d\n", spark_book_keeper.buffer_index[i]);
+                            print_debug_info("DEBUG: current packet count for this Spark is %d\n", spark_bookkeeper.count_per_libera[i]);
+                            print_debug_info("DEBUG: current buffer index for this Spark is %d\n", spark_bookkeeper.buffer_index[i]);
 
                         }else {
-                            spark_book_keeper.buffer_index[i] = 0;                         // go to beginning
-                            queue[i][spark_book_keeper.buffer_index[i]] = packet ;         // then register the packet
+                            spark_bookkeeper.buffer_index[i] = 0;                         // go to beginning
+                            queue[i][spark_bookkeeper.buffer_index[i]] = packet ;         // then register the packet
                         }
                     }
-                    if (spark_book_keeper.count_per_libera[i] == 1000) send_data = 2;
+                    if (spark_bookkeeper.count_per_libera[i] == 1000) send_data = 2;
                 }
                 
 
