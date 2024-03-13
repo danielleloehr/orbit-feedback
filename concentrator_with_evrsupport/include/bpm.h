@@ -34,8 +34,8 @@ struct bookKeeper{
     int buffer_index[NO_SPARKS];
 };
 
-/* Hardcoded address book*/
-static char ADDRESS_BOOK[32][16] = { 
+/* Hardcoded example address book*/
+static char *example_addressbook [32] = { 
                                      "1.1.1.171",    // Spark 1 at 0
                                      "1.1.1.172",
                                      "1.1.1.173",
@@ -74,7 +74,8 @@ static char ADDRESS_BOOK[32][16] = {
 /************************************
  * FUNCTION PROTOTYPES
  ************************************/
-void init_bookkeeper(struct bookKeeper *book_keeper);
+void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]);
+char *get_ipaddr_printable(int ip);
 void print_addressbook(struct bookKeeper *book_keeper);
 void print_payload(int payload[PAYLOAD_FIELDS]);
 void print_payload_test(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 

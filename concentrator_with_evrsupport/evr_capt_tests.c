@@ -32,12 +32,6 @@
 #define MAX_BUFF_SIZE 20000     
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL */
 
-/* Main server information                          
-   Forward compressed packets to this address       */
-/* TODO: replace by ZeroMQ */
-static char LOCAL_ADDR[16] = "192.168.2.200"; 
-static int LOCAL_PORT = 2049;               /* needs to be different than 2048 */
-
 static volatile int send_data;
 int evr_fd;
 
@@ -49,6 +43,7 @@ static int GLOBAL_PACKET_COUNTER;
     tic is set by the "STOP" thread.    
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
+
 
 #if SOFT_IRQ
     /* Artifial pacemaker to set the rate at which 
@@ -71,20 +66,6 @@ struct timespec tic, toc;       // not used right now
     }
 #endif
 
-//-------------------------------------------------------------------------------------------------
-// TODO: please remove this once the test passes 
-#ifdef EVR_API_IRQ
-/* This will stop the wave when interrupt thread handles an IRQ */
-void signal_ready_to_send(int signum){
-	print_debug_info("DEBUG: Concentrate and send signal in!.\n");
-    /* Clock toc here, */
-	//clock_gettime(CLOCK_MONOTONIC, &toc);   
-    print_debug_info("DEBUG: Counter in signal handler : %d.\n", GLOBAL_PACKET_COUNTER);
-    send_data = 1;
-}
-#endif
-//-------------------------------------------------------------------------------------------------
-
 /* Blocking read that doesn't harm anyone yet */
 void uio_read(){
     select_affinity(CPU_CORE);
@@ -98,40 +79,41 @@ void uio_read(){
 }
 
 /* Queue must be Global */
-void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sockaddr_in transmit_server, void *requester, struct Message msg){
+void compress_and_send(struct bookKeeper *spark_book_keeper, void *publisher, struct Message msg){
     /********************************************/
     /* Payload Compression                      */
     /********************************************/
-    long long payload_sums[PAYLOAD_FIELDS];                              /*TODO*/
+    long long payload_sums[PAYLOAD_FIELDS];                         
     int compact_payload[PAYLOAD_FIELDS];
 
-    for(int i=0; i < NO_SPARKS; i++){	// not all sparks  /* CAREFUL*/ 
+    for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
-      
+       
         //int buffer_start = book_keeper.count_per_libera[i] - book_keeper.buffer_index[i];
         //printf("buffer start %d normalised %d\n", buffer_start, MAX_BUFF_SIZE-buffer_start);
 				
         // Assume buffer didn't "overflow" and always start from the beginning.
         // there is a mechanism for overflow but nothing for data integrity
-        for(int curr_ind = 0; curr_ind < book_keeper->count_per_libera[i]; curr_ind++){ 
+        for(int curr_ind = 0; curr_ind < spark_book_keeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
+                // Don't sum indices 8(LTM_h), 9(LTM_h) and 15(status), just use the fields of the latest packet
                 if (payload_ind == 8 || payload_ind == 9 || payload_ind == 15){
-                    payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];         //overwrite to the last packet
+                    payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];      
                 }else{
                     payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
                     //buffer_start++;
                 }
-
             }                           
         }
 		//print_debug_info("DEBUG: Payload sums vA for Spark 0 %d\n", payload_sums[0]);			
 
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-            if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){                       // TODO bitmask this..
+            // Don't divide values = 0, and indices 8(LTM_h), 9(LTM_h) and 15(status)
+            if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){ 
                 compact_payload[ind] = (int) payload_sums[ind]; 
             }else{
-                compact_payload[ind] = (int) (payload_sums[ind]/book_keeper->count_per_libera[i]);                
+                compact_payload[ind] = (int) (payload_sums[ind]/spark_book_keeper->count_per_libera[i]);                
             }
         }
 
@@ -139,16 +121,14 @@ void send_spark_data(struct bookKeeper *book_keeper, int trans_sock, struct sock
             print_payload(compact_payload);
         #endif
 
-        //sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
-
         memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%d", "s", i);
-	    // this should display the "last xxx" of the IP address according to the book keeper!!
-        zmq_send(requester, &msg, sizeof(struct Message), 0);  //btw this works I am just trying to figure out why alarm stops working
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_book_keeper->box_id[i]));  //i+1
+        print_debug_info("DEBUG: %s\n", msg.spark_id);
+        zmq_send(publisher, &msg, sizeof(struct Message), 0); 
 
         // Clean up
-        book_keeper->count_per_libera[i] = 0;
-        book_keeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
+        spark_book_keeper->count_per_libera[i] = 0;
+        spark_book_keeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
         // Always overwrite the buffer. 
     }
 }
@@ -175,7 +155,7 @@ void display_current_config(void) {
 
     printf("\n");
 
-    printf("Number of Connected Sparks: %d\n", NO_SPARKS);
+    printf("Number of Connected Sparks: \033[92m%d\033[0m\n", NO_SPARKS);
     printf("\n");
 
     printf("Server Configuration\n");
@@ -188,8 +168,8 @@ void display_current_config(void) {
     }
 
     printf("Interrupt Control Mode: ");
-    if(EVR_IRQ) printf("\033[92m\033[92mEVR_IRQ\033[0m");
-    if(SOFT_IRQ) printf("\033[92m\033[92mSOFT_IRQ\033[0m");
+    if(EVR_IRQ) printf("\033[92mEVR_IRQ\033[0m");
+    if(SOFT_IRQ) printf("\033[92mSOFT_IRQ\033[0m");
     printf("\n");
     
     printf("CPU core selection for multithreading: CPU %d\n", CPU_CORE);
@@ -207,20 +187,21 @@ int main(){
 
     display_current_config(); 
 
-    pthread_t irq_thread_id;
-    GLOBAL_PACKET_COUNTER = 0;
-    
-    /* TEST MODE */
-    #if TESTMODE
-        int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
-    #endif
-
     /********************************************/
     /* Packet Collection                        */
     /********************************************/
     static struct packetRecord packet;   
-    struct bookKeeper book_keeper;
-    init_bookkeeper(&book_keeper);
+    struct bookKeeper spark_book_keeper;
+    init_bookkeeper(&spark_book_keeper, example_addressbook);
+    print_addressbook(&spark_book_keeper);
+
+    /* TEST MODE */
+    #if TESTMODE
+        int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
+    #endif
+    
+    pthread_t irq_thread_id;
+    GLOBAL_PACKET_COUNTER = 0;
     
     /********************************************/
     /* Open EVR device                          */ 
@@ -233,8 +214,9 @@ int main(){
     }
 
     /********************************************/
-    /* Socket for Reception to collect original */
-    /*  data                                    */
+    /* Socket for Reception to collect from     */
+    /*  Sparks and Client parameters            */
+    /*                                          */
     /********************************************/
     int sock_collection; 
     struct sockaddr_in receive_server;
@@ -243,53 +225,22 @@ int main(){
         perror("Socket binding failed. Exiting now..\n");
         exit(EXIT_FAILURE);
     }
-    
     /**/
 	long extend_buffer = 16777216;
 	setsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF,&extend_buffer, sizeof(long)); 
 
-    /********************************************/
-    /* Client parameters for packet reception   */
-    /********************************************/
     int client_addr_size;
     struct sockaddr_in client;
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
 
-
-    /********************************************/                  
-    /* Socket to collect concentrated packets   */
-    /********************************************/
-    int sock_concentrated;
-    struct sockaddr_in transmit_server;
-
-    if ((sock_concentrated = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
-        perror("socket()");
-        return -1;
-    }
-
-    /* Set up the server name */
-    transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
-    transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
-    transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
-  
-
     /********************************************/
     /* ZeroMQ PUB/SUB                           */
     /********************************************/
     struct Message msg;
-
     void *context = zmq_ctx_new ();
-    void *requester = zmq_socket (context, ZMQ_PUB);
-
-	/* Single Spark experiment */
-	/* Connect to one listening socket */
-	//char libera_send_address[27];
-	//int sparkport = 9999;   // in case you would like to send to different ports       
-	//snprintf(libera_send_address, sizeof(libera_send_address), "%s%s%s%d", "tcp://", LOCAL_ADDR,":", sparkport);	
-
-    //zmq_connect (requester, libera_send_address);
-    zmq_bind(requester, "tcp://*:9999");
+    void *publisher = zmq_socket (context, ZMQ_PUB);
+    zmq_bind(publisher, "tcp://*:9999");
 
     /*******************************************************************************/
     /* MAIN */
@@ -300,7 +251,7 @@ int main(){
    
     /* Start thread for interrupt handling */ 
     print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
-    pthread_create(&irq_thread_id, NULL, uio_read, NULL);
+    pthread_create(&irq_thread_id, NULL, (void *) uio_read, NULL);
     
     #if(SOFT_IRQ)
         ualarm(ALARM_USEC, 0);
@@ -308,14 +259,14 @@ int main(){
     #endif
 
     while(1){
-        if(send_data){
-            send_spark_data(&book_keeper,sock_concentrated, transmit_server, requester, msg);
+        if(send_data == 2){
+            compress_and_send(&spark_book_keeper, publisher, msg);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
 
         if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, (socklen_t *) &client_addr_size) >= 0){
-            /* Record the packet (only valid for extended structures) */
+            /* Record the packet */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
             GLOBAL_PACKET_COUNTER++;
 
@@ -333,16 +284,16 @@ int main(){
 
                 // Semi-cyclic registeration
                 for(int i=0; i<NO_SPARKS; i++){
-                    if(packet.id == book_keeper.box_id[i]){             // Get the box ID                   
-                        book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
+                    if(packet.id == spark_book_keeper.box_id[i]){             // Get the box ID                   
+                        spark_book_keeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
 
-                        // Check the buffer limits                          <-- Check this again
-                        if (book_keeper.count_per_libera[i] < MAX_BUFF_SIZE){
-                            queue[i][book_keeper.buffer_index[i]] = packet ;
-                            book_keeper.buffer_index[i]++;
+                        // Check the buffer limits                              <-- Check this again
+                        if (spark_book_keeper.count_per_libera[i] < MAX_BUFF_SIZE-1){
+                            queue[i][spark_book_keeper.buffer_index[i]] = packet ;
+                            spark_book_keeper.buffer_index[i]++;
                         }else {
-                            book_keeper.buffer_index[i] = 0;                         // go to beginning
-                            queue[i][book_keeper.buffer_index[i]] = packet ;         // then register the packet
+                            spark_book_keeper.buffer_index[i] = 0;                         // go to beginning
+                            queue[i][spark_book_keeper.buffer_index[i]] = packet ;         // then register the packet
                         }
                     }
                 }
@@ -352,7 +303,7 @@ int main(){
         }else{
             perror("recvfrom()");
             if(errno == EINTR){
-                //send_spark_data(&book_keeper,sock_concentrated, transmit_server);
+                // Check how often we end up here with mrfioc2. Priority : Not urgent
                 continue;
             }else {
                 // all other errors
@@ -360,13 +311,12 @@ int main(){
             }		
         }
     } 
-    zmq_close (requester);
-    zmq_ctx_destroy (context);
 
     /* Never reach */
     /* Deallocate the socket*/
     close(sock_collection);
-    close(sock_concentrated);
+    zmq_close (publisher);
+    zmq_ctx_destroy (context);
 
     return 0;
 }

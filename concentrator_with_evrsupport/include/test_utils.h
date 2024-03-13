@@ -125,7 +125,7 @@ void fancy_print(int boolean) {
     char line[32];
     if (boolean == 1) {
         human_word = "ON";
-        snprintf(line, sizeof(line), "%s%s%s", "\033[92m\033[92m", human_word, "\033[0m");  
+        snprintf(line, sizeof(line), "%s%s%s", "\033[92m", human_word, "\033[0m");  
         printf("%s", line);
         
     }
