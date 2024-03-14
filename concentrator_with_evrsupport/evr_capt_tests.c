@@ -32,8 +32,13 @@ TODO
 /* DEBUG_ON can be toogled in test_utils */
 /******************************/
 
-#define MAX_BUFF_SIZE 1000000     
-static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];         /* CAREFUL */
+/* Please adjust these parameters carefully */
+/* queue size per Spark  */
+#define MAX_BUFF_SIZE 1000000       
+/* an estimated value for averaging in the case of an overflow */
+#define EST_PACKET_COUNT 10000      
+
+static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];     
 
 static volatile int send_data;
 int evr_fd;
@@ -92,15 +97,17 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, str
     for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
 
-        // Please check if this works
-        int buffer_overflow = spark_bookkeeper->count_per_libera[i] - spark_bookkeeper->buffer_index[i];
-        //print_debug_info("DEBUG: buffer overflowed by %d \n", buffer_overflow);
-
-        // Overwrite the count value if there was an overflow to regard only the latest packets in the full queue
-        if(buffer_overflow != 0){
-            spark_bookkeeper->count_per_libera[i] = MAX_BUFF_SIZE - spark_bookkeeper->count_per_libera[i];
-            print_debug_info("DEBUG: new count for Spark %s is %d \n", 
-                                get_ipaddr_printable(spark_bookkeeper->box_id[i], 1), spark_bookkeeper->count_per_libera[i]);
+        // Overwrite the count value if there was an overflow to average over only the latest packets in the full queue
+        int buffer_overflow = spark_bookkeeper->count_per_libera[i] - MAX_BUFF_SIZE;    
+        if(buffer_overflow >= 0 ){
+            printf("WARNING: Buffer overflow (or edge condition) is reported.\n");
+            if(!(buffer_overflow % MAX_BUFF_SIZE)){
+                print_debug_info("DEBUG: Edge Cond. Averaging over MAX_BUFF_SIZE (=%d)\n", MAX_BUFF_SIZE);
+                spark_bookkeeper->count_per_libera[i] = MAX_BUFF_SIZE;
+            }else{
+                print_debug_info("DEBUG: Overflow. Averaging over fixed packet count (=%d)\n", EST_PACKET_COUNT);
+                spark_bookkeeper->count_per_libera[i] = EST_PACKET_COUNT;
+            }
         }
 		
         for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
@@ -109,7 +116,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, str
                 if (payload_ind == 8 || payload_ind == 9 || payload_ind == 15){
                     payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];      
                 }else{
-                    payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];		//queue[i][buffer_start] 
+                    payload_sums[payload_ind] += queue[i][curr_ind].liberaData[payload_ind];
                 }
             }                           
         }		
@@ -124,22 +131,20 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, str
             }
         }
 
+        memcpy(msg.payload, compact_payload, sizeof(compact_payload));
+        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_bookkeeper->box_id[i], 1)); 
+        zmq_send(publisher, &msg, sizeof(struct Message), 0); 
+
         #if DUMP_PAYLOAD
+            print_debug_info("DEBUG: %s\n", msg.spark_id);
             print_payload(compact_payload);
         #endif
 
-        memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_bookkeeper->box_id[i], 1));  //i+1
-        print_debug_info("DEBUG: %s\n", msg.spark_id);
-        zmq_send(publisher, &msg, sizeof(struct Message), 0); 
-
         // Clean up
         spark_bookkeeper->count_per_libera[i] = 0;
-        spark_bookkeeper->buffer_index[i] = 0; // just do yourself a favor here. Start writing from the beginning
         // Always overwrite the buffer. 
+        spark_bookkeeper->buffer_index[i] = 0;         
     }
-    
-    sleep(10);
 }
 
 
@@ -259,11 +264,13 @@ int main(){
         /* Print this to make our lives bit easier when we later parse with pandas */
         printf("sec, nanosec\n");
     #endif
-   
+
     /* Start thread for interrupt handling */ 
-    print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
-    pthread_create(&irq_thread_id, NULL, (void *) uio_read, NULL);
-    
+    #if(EVR_IRQ)
+        print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
+        pthread_create(&irq_thread_id, NULL, (void *) uio_read, NULL);
+    #endif
+
     #if(SOFT_IRQ)
         ualarm(ALARM_USEC, 0);
 	    signal(SIGALRM, concentration_pacemaker);
@@ -293,13 +300,11 @@ int main(){
                 packet.src_port = ntohs(client.sin_port);
                 packet.id = client.sin_addr.s_addr; 
 
-                // Semi-cyclic registeration
                 for(int i=0; i<NO_SPARKS; i++){
                     if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
                         spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
-
                         // Check the buffer limits                                 
-                        if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE){
+                        if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
                             spark_bookkeeper.buffer_index[i]++;
                         }else {
@@ -308,9 +313,8 @@ int main(){
                         }
                     }
                 }
-
             #endif   
-            
+ 
         }else{
             perror("recvfrom()");
             if(errno == EINTR){
