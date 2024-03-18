@@ -30,7 +30,7 @@ int main (int argc, char *argv []){
     void *context = zmq_ctx_new ();
     void *subscriber = zmq_socket (context, ZMQ_SUB); 
         
-    int rc = zmq_connect (subscriber, "tcp://10.42.0.44:9999");      //Richards address
+    int rc = zmq_connect (subscriber, "tcp://192.168.21.244:9999");      //Richards address
     const char *filter = (argc > 1)? argv [1]: "";
     zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, filter, strlen(filter));
     assert (rc == 0);
