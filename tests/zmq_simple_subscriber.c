@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 /* Message struct consistency */
 #include "sockets.h"
@@ -44,6 +45,8 @@ int main (int argc, char *argv []){
          { subscriber,   0, ZMQ_POLLIN, 0 }
          //{ subscriber_no2, 0, ZMQ_POLLIN, 0}
      };
+    
+    struct timespec tic;
 
     while (1) {
         /* Create an empty 0MQ message */
@@ -56,6 +59,10 @@ int main (int argc, char *argv []){
          if (items[0].revents & ZMQ_POLLIN){
             /* Receive message and transfer it to our message struct*/
             zmq_msg_recv(&zmsg, subscriber, 0);
+            /* Timestamp */
+            clock_gettime(CLOCK_MONOTONIC, &tic);
+            printf("Alarm timestamp %.5f\n",(double)tic.tv_sec + 1.0e-9 * tic.tv_nsec);
+
             msg = (struct Message *)zmq_msg_data(&zmsg);
 
             printf ("\nSpark %s sent this: \n", msg->spark_id);
