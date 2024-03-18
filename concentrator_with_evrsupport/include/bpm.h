@@ -9,7 +9,7 @@
 /* LIBERA SPARK parameters */
 #define FRAME_COMPLETE 30
 #define PAYLOAD_FIELDS 16
-#define NO_SPARKS 1
+#define NO_SPARKS 7
 
 /* Number of packets to accept until socket is closed
     for 1GbE: 10264 pps, 10GbE: 10260 pps*/
@@ -35,6 +35,16 @@ struct bookKeeper{
 };
 
 /* Hardcoded example address book*/
+static char *mtca1c1s1s14g_addressbook[7] = {   "1.1.1.61",
+                                                "1.1.1.62",
+                                                "1.1.1.63",
+                                                "1.1.1.64",
+                                                "1.1.1.65",
+                                                "1.1.1.66",
+                                                "1.1.1.67"
+};
+
+
 static char *example_addressbook [32] = { 
                                      "1.1.1.171",    // Spark 1 at 0
                                      "1.1.1.172",

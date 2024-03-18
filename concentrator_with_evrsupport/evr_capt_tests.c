@@ -24,7 +24,7 @@ TODO
 #define DUMP_PAYLOAD    	1
 #define CPU_CORE            1
 
-#define EVR_IRQ             0
+#define EVR_IRQ             1
 #define SOFT_IRQ            0
 #define ALARM_USEC       	6666.66
 
@@ -206,7 +206,7 @@ int main(){
     /********************************************/
     static struct packetRecord packet;   
     struct bookKeeper spark_bookkeeper;
-    init_bookkeeper(&spark_bookkeeper, example_addressbook);
+    init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);   // HERE
     print_addressbook(&spark_bookkeeper);
 
     /* TEST MODE */
