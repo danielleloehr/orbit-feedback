@@ -55,7 +55,7 @@ int main (int argc, char *argv []){
         zmq_msg_init (&zmsg);
         //zmq_msg_init_size(&zmsg, sizeof(struct Message));
 
-         zmq_poll(items, 2, -1);
+         zmq_poll(items, 1, -1);
          if (items[0].revents & ZMQ_POLLIN){
             /* Receive message and transfer it to our message struct*/
             zmq_msg_recv(&zmsg, subscriber, 0);
