@@ -13,9 +13,6 @@ TODO
 #include "test_utils.h"		// keep this here GNU_SOURCE
 #include "bpm.h"
 #include "sockets.h"
- 
-#include <zmq.h>
-#include<sys/wait.h>
 
 /******************************/
 /* OPERATION CONTROL          */
@@ -40,8 +37,8 @@ TODO
 
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];     
 
-static char LOCAL_ADDR[16] = "192.168.21.34"; 
-static int LOCAL_PORT = 2049;       // dont use 2048
+static char DEFAULT_ADDR[16] = "192.168.21.34"; 
+static int DEFAULT_PORT = 2049;  
 
 static volatile int send_data;
 int evr_fd;
@@ -90,12 +87,17 @@ void uio_read(){
 }
 
 /* Queue must be Global */
-void send_spark_data(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
+void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
     /********************************************/
     /* Payload Compression                      */
+    /* Payload :                                
+      vA | vB | vC | vD | Sum | Q | X | Y | LMT_l | LMT_h | res.| res.| res.| res.| res.| status
+        0|   1|   2|   3|    4|  5|  6|  7|      8|      9|    10|  11|   12|   13|   14|     15|
     /********************************************/
     long long payload_sums[PAYLOAD_FIELDS];                         
     int compact_payload[PAYLOAD_FIELDS];
+
+    int arrayXY_all[NO_SPARKS*2];
 
     for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
@@ -134,7 +136,11 @@ void send_spark_data(struct bookKeeper *spark_bookkeeper, int trans_sock, struct
             }
         }
 
-        sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
+        arrayXY_all[i] = compact_payload[6];
+        arrayXY_all[i+7] = compact_payload[7];
+
+        /* If you want to send individual compact payload */
+        // sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
         #if DUMP_PAYLOAD
             print_payload(compact_payload);
@@ -145,6 +151,14 @@ void send_spark_data(struct bookKeeper *spark_bookkeeper, int trans_sock, struct
         // Always overwrite the buffer. 
         spark_bookkeeper->buffer_index[i] = 0;         
     }
+    //debug delete 
+    for(int i=0; i < NO_SPARKS*2; i++){
+        printf("%d\t", arrayXY_all[i]);
+    }
+    printf("\n");
+
+    /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
+    sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 }
 
 
@@ -197,7 +211,15 @@ void display_current_config(void) {
 }
 
 
-int main(){    
+int main(int argc, char *argv[]){   
+
+    char *remote_addr;
+    int remote_port; 
+
+    if (argc == 3){
+        remote_addr = argv[1];
+        sscanf(argv[2], "%d", &remote_port);
+    }
 
     display_current_config(); 
 
@@ -206,7 +228,7 @@ int main(){
     /********************************************/
     static struct packetRecord packet;   
     struct bookKeeper spark_bookkeeper;
-    init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);   // HERE
+    init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);      // HERE
     print_addressbook(&spark_bookkeeper);
 
     /* TEST MODE */
@@ -262,18 +284,9 @@ int main(){
     }
 
     /* Set up the server name */
-    transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
-    transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
-    transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
-  
-
-    // /********************************************/
-    // /* ZeroMQ PUB/SUB                           */
-    // /********************************************/
-    // struct Message msg;
-    // void *context = zmq_ctx_new ();
-    // void *publisher = zmq_socket (context, ZMQ_PUB);
-    // zmq_bind(publisher, "tcp://*:9999");
+    transmit_server.sin_family      = AF_INET;               /* Internet Domain     */
+    transmit_server.sin_port        = htons(remote_port);     /* Server Port        */
+    transmit_server.sin_addr.s_addr = inet_addr(remote_addr); /* Server's Address   */
 
     /*******************************************************************************/
     /* MAIN */

@@ -25,7 +25,7 @@ evr_capt_tests.o: evr_capt_tests.c $(DEPS)
 
 # Build irq-capture 
 $(TARGET): $(OBJ) $(DEPS)
-	$(CC) $(CFLAGS) -o $@ $^  -lpthread -lzmq
+	$(CC) $(CFLAGS) -o $@ $^  -lpthread
 
 .PHONY: clean
 
