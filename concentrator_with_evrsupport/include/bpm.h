@@ -3,6 +3,7 @@
 #define BPM
 
 #include <stdio.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <time.h>
 
@@ -84,7 +85,8 @@ static char *example_addressbook [32] = {
 /************************************
  * FUNCTION PROTOTYPES
  ************************************/
-void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]);
+//void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]);
+void init_bookkeeper(struct bookKeeper *book_keeper, char *select_book);
 char *get_ipaddr_printable(int ip, int lastbyte);
 void print_addressbook(struct bookKeeper *book_keeper);
 void print_payload(int payload[PAYLOAD_FIELDS]);

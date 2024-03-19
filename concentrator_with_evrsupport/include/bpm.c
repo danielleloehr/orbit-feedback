@@ -1,13 +1,20 @@
 #include "bpm.h"
 
 /* Initiliases the book keeper entity */
-void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]) {
+//void init_bookkeeper(struct bookKeeper *book_keeper, char *address_book[]) {
+void init_bookkeeper(struct bookKeeper *book_keeper, char *sel) {
     /* Copy from hard-coded address book */    
     for(int i=0; i<NO_SPARKS; i++){
         book_keeper->count_per_libera[i] = 0;   
         book_keeper->buffer_index[i] = 0; 
         //book_keeper->box_id[i] = inet_addr(ADDRESS_BOOK[i]);
-        book_keeper->box_id[i] = inet_addr(address_book[i]);
+
+        if(strcmp("c1s1s14g", sel) == 0){
+             book_keeper->box_id[i] = inet_addr(mtca1c1s1s14g_addressbook[i]);
+        }else{
+            printf("No address book is selected\n");
+            exit(1);
+        }       
     } 
 }
 
