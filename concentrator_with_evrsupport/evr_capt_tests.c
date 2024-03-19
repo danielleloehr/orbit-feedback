@@ -40,6 +40,9 @@ TODO
 
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];     
 
+static char LOCAL_ADDR[16] = "192.168.21.34"; 
+static int LOCAL_PORT = 2049;       // dont use 2048
+
 static volatile int send_data;
 int evr_fd;
 
@@ -87,7 +90,7 @@ void uio_read(){
 }
 
 /* Queue must be Global */
-void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, struct Message msg){
+void send_spark_data(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
     /********************************************/
     /* Payload Compression                      */
     /********************************************/
@@ -131,12 +134,9 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, void *publisher, str
             }
         }
 
-        memcpy(msg.payload, compact_payload, sizeof(compact_payload));
-        snprintf(msg.spark_id, sizeof(msg.spark_id), "%s%s", "s", get_ipaddr_printable(spark_bookkeeper->box_id[i], 1)); 
-        zmq_send(publisher, &msg, sizeof(struct Message), 0); 
+        sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
         #if DUMP_PAYLOAD
-            print_debug_info("DEBUG: %s\n", msg.spark_id);
             print_payload(compact_payload);
         #endif
 
@@ -250,13 +250,30 @@ int main(){
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
 
+    /********************************************/                  
+    /* Socket to collect concentrated packets   */
     /********************************************/
-    /* ZeroMQ PUB/SUB                           */
-    /********************************************/
-    struct Message msg;
-    void *context = zmq_ctx_new ();
-    void *publisher = zmq_socket (context, ZMQ_PUB);
-    zmq_bind(publisher, "tcp://*:9999");
+    int sock_concentrated;
+    struct sockaddr_in transmit_server;
+
+    if ((sock_concentrated = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+        perror("socket()");
+        return -1;
+    }
+
+    /* Set up the server name */
+    transmit_server.sin_family      = AF_INET;               /* Internet Domain    */
+    transmit_server.sin_port        = htons(LOCAL_PORT);     /* Server Port        */
+    transmit_server.sin_addr.s_addr = inet_addr(LOCAL_ADDR); /* Server's Address   */
+  
+
+    // /********************************************/
+    // /* ZeroMQ PUB/SUB                           */
+    // /********************************************/
+    // struct Message msg;
+    // void *context = zmq_ctx_new ();
+    // void *publisher = zmq_socket (context, ZMQ_PUB);
+    // zmq_bind(publisher, "tcp://*:9999");
 
     /*******************************************************************************/
     /* MAIN */
@@ -278,7 +295,7 @@ int main(){
 
     while(1){
         if(send_data){
-            compress_and_send(&spark_bookkeeper, publisher, msg);
+            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
@@ -330,8 +347,6 @@ int main(){
     /* Never reach */
     /* Deallocate the socket*/
     close(sock_collection);
-    zmq_close (publisher);
-    zmq_ctx_destroy (context);
 
     return 0;
 }
