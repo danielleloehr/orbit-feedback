@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <time.h>
 
@@ -35,7 +36,7 @@ struct bookKeeper{
     int buffer_index[NO_SPARKS];
 };
 
-/* Hardcoded example address book*/
+/* Hardcoded address books*/
 static char *mtca1c1s1s14g_addressbook[7] = {   "1.1.1.61",
                                                 "1.1.1.62",
                                                 "1.1.1.63",
@@ -46,8 +47,7 @@ static char *mtca1c1s1s14g_addressbook[7] = {   "1.1.1.61",
 };
 
 
-static char *example_addressbook [32] = { 
-                                     "1.1.1.171",    // Spark 1 at 0
+static char *injector_test[32] = {   "1.1.1.171",    // Spark 1 at 0
                                      "1.1.1.172",
                                      "1.1.1.173",
                                      "1.1.1.174",
@@ -79,7 +79,7 @@ static char *example_addressbook [32] = {
                                      "1.1.1.200",   //30
                                      "1.1.1.201",
                                      "1.1.1.202"    //32                          
-                                     };
+};
 
 
 /************************************
@@ -92,5 +92,6 @@ void print_addressbook(struct bookKeeper *book_keeper);
 void print_payload(int payload[PAYLOAD_FIELDS]);
 void print_payload_test(int n, long int vA, long int vB, long int vC, long int vD, long int SUM, 
                    long int Q, long int X, long int Y);
+void list_addressbooks(void);
 
 #endif

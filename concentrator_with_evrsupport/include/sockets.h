@@ -7,20 +7,14 @@
 #include <netdb.h>
 
 /************************************
- * TYPEDEFS
- ************************************/
-struct Message{
-    char spark_id[5];
-    int payload[16];
-};
-
-/************************************
  * EXPORTED VARIABLES
  ************************************/
-/* Server's Internet Address  */
-static char IP_ADDR[16] = "1.1.2.1";    
-/* Libera default port      */
-static int PORT = 2048;
+/* Server's Internet Address 
+    (=libera gbe.dest.ip)           */
+static char MY_IP_ADDR[16] = "1.1.2.1";    
+/* Libera default port      
+    (=libera gbe.dest.port)         */
+static int MY_PORT = 2048;
 
 /************************************
  * FUNCTION PROTOTYPES

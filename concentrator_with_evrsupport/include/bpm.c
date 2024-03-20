@@ -9,8 +9,10 @@ void init_bookkeeper(struct bookKeeper *book_keeper, char *sel) {
         book_keeper->buffer_index[i] = 0; 
         //book_keeper->box_id[i] = inet_addr(ADDRESS_BOOK[i]);
 
-        if(strcmp("c1s1s14g", sel) == 0){
-             book_keeper->box_id[i] = inet_addr(mtca1c1s1s14g_addressbook[i]);
+        if(strcmp("mtca1c1s1s14g", sel) == 0){
+            book_keeper->box_id[i] = inet_addr(mtca1c1s1s14g_addressbook[i]);
+        }else if(strcmp("injector", sel) == 0){
+            book_keeper->box_id[i] = inet_addr(injector_test[i]);
         }else{
             printf("No address book is selected\n");
             exit(1);
@@ -18,6 +20,10 @@ void init_bookkeeper(struct bookKeeper *book_keeper, char *sel) {
     } 
 }
 
+/* Please keep up-to-date. */
+void list_addressbooks(void){
+    printf("Available sections: \n \tmtca1c1s1s14g (7 SPARKS), injector (32 SPARKS)\n");
+}
 
 char *get_ipaddr_printable(int ip, int lastbyte){
     static char ipaddress[16];

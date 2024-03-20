@@ -18,9 +18,9 @@
 #include <stdarg.h>
 #include <termios.h>
 #include <signal.h>
+
 //careful <time.h> here caused an one time issue that never happened before
 #include <errno.h> 
-
 
 #define TIME_LIMIT_USEC 100     /* Stopwatch */
 #define DEBUG_ON        1
@@ -29,16 +29,70 @@
     #define print_debug_info(format, ...)  fprintf (stderr, format, ##__VA_ARGS__)
 #endif
 
+static const char green[] = "\033[92m";
+static const char blue[] = "\033[34m";
+static const char red[] = "\033[91m";
+static const char black[] = "\033[0m";
+
+static int ST_attention = 1;
+static int ST_ignore = 2;
+static int ST_warning = 3;
+
 /************************************
  * GLOBAL FUNCTION PROTOTYPES
  ************************************/
 int mygetch (void);
 void alarm_handler(int s);
 void hexdumpunformatted(void *ptr, int buflen);
-void fancy_print(int boolean);
-char *humanise(int boolean);
+void humanise(int boolean);
 double get_elapsed_time_usec(struct timespec *tic, struct timespec *toc);
 int select_affinity(int core_id);
+void myprintf(int status, char f, char *yourstring);
+void printhelp();
+
+
+void printhelp(){
+    printf("usage: ./irq-capture [-i <dest_ip>] [-p <dest_port>] [-b <bpm_selection>] [-h] [-d]\n");
+    printf("where: \n \t-h \tprint this help message\n");
+    printf("\t-d \tdump compressed payload to stdout\n");
+    printf("\t-l \tlist available address books\n");
+    printf("\t-i \tIP address of a remote host that receives the compressed BPM data\n");
+    printf("\t-p \tport of a remote host that receives the compressed BPM data\n");
+    printf("\t-b \tBPM section to select the corresponding IP addressbook\n");
+
+    exit(EXIT_SUCCESS);
+}
+
+
+void myprintf(int status, char f, char *yourstring){
+    char buffer[100];
+
+    char *format;
+    if(f == 'd'){
+        format = "%s%d%s";
+    }else if(f == 's'){
+        format = "%s%s%s";
+    }else{
+        printf("Unspecified format!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    switch(status){
+        case 1:
+           snprintf(buffer, sizeof(buffer),format, green, yourstring, black);
+           break;
+        case 2:
+            snprintf(buffer, sizeof(buffer),format, blue, yourstring, black);
+            break;
+        case 3:
+            snprintf(buffer, sizeof(buffer),format, red, yourstring, black);
+            break;
+        default:
+            snprintf(buffer, sizeof(buffer),format, black, yourstring, black);
+            break;
+    }
+    printf("%s\n", buffer); 
+}
 
 
 /* Wrapper to set CPU affinity for the thread */ 
@@ -120,34 +174,18 @@ void hexdumpunformatted(void *ptr, int buflen) {
 /* 
  Colourful print to grab attention
 */
-void fancy_print(int boolean) {
+
+void humanise(int boolean) {
     char *human_word;
-    char line[32];
     if (boolean == 1) {
         human_word = "ON";
-        snprintf(line, sizeof(line), "%s%s%s", "\033[92m", human_word, "\033[0m");  
-        printf("%s", line);
-        
+        myprintf(ST_attention, 's', human_word);
     }
 
     if (boolean == 0) {
         human_word = "OFF";
-        snprintf(line, sizeof(line), "%s%s%s", "\033[34m", human_word, "\033[0m"); 
-        printf("%s", line);
-        //printf("%s", human_word);
+        myprintf(ST_ignore, 's', human_word);
     }
-    memset(line, 0, sizeof(line));
-    printf("\n");
-}
-
-/*
- Converts {0,1} to {OFF, ON} for human users
-*/
-char *humanise(int boolean) {
-     if (boolean == 1) return "ON";
-     if (boolean == 0) return "OFF";
-
-     return 0;
 }
 
 /*

@@ -14,15 +14,16 @@ TODO
 #include "bpm.h"
 #include "sockets.h"
 
+#include <ctype.h>
+#include <getopt.h>
+
 /******************************/
 /* OPERATION CONTROL          */
 #define LATENCY_PERF 	    0
 #define REGISTER 		    1
-#define DUMP_PAYLOAD    	1
-#define CPU_CORE            1
-
 #define EVR_IRQ             1
 #define SOFT_IRQ            0
+#define CPU_CORE            1
 #define ALARM_USEC       	6666.66
 
 #define TESTMODE            0
@@ -35,13 +36,23 @@ TODO
 /* an estimated value for averaging in the case of an overflow */
 #define EST_PACKET_COUNT 10000      
 
-static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];     
-
-static char DEFAULT_ADDR[16] = "192.168.21.34"; 
-static int DEFAULT_PORT = 2049;  
+static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];       
 
 static volatile int send_data;
 int evr_fd;
+
+/******************************/
+/* Commandline arguments      */
+static char *dest_ip;
+static int dest_port;
+static char *select_bpms;
+static int debug_payload;
+/******************************/
+
+static char *DEFAULT_ADDR = "192.168.21.34"; 
+static int DEFAULT_PORT = 2049;
+static char *DEFAULT_BPM_SELECTION = "mtca1c1s1s14g";
+static int DEFAULT_DEBUG = 0;
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
@@ -51,7 +62,6 @@ static int GLOBAL_PACKET_COUNTER;
     tic is set by the "STOP" thread.    
     toc is set after the inner while loop is broken */
 struct timespec tic, toc;       // not used right now
-
 
 #if SOFT_IRQ
     /* Artifial pacemaker to set the rate at which 
@@ -142,9 +152,9 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         /* If you want to send individual compact payload */
         // sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
-        #if DUMP_PAYLOAD
+        if(debug_payload){
             print_payload(compact_payload);
-        #endif
+        }
 
         // Clean up
         spark_bookkeeper->count_per_libera[i] = 0;
@@ -161,46 +171,55 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 }
 
-
+/* Print out curernt settings and relevant parameters */
 void display_current_config(void) {
     printf("---------------------------------------\n");
     printf("Current Capture Configuration\n");
     
     printf("Latency Performance Recording: "); 
-    fancy_print(LATENCY_PERF);
-
-    printf("Compressed Payload Dump: ");
-    fancy_print(DUMP_PAYLOAD);  
- 
+    humanise(LATENCY_PERF);
     printf("Packet Registery: ");
-    fancy_print(REGISTER);
+    humanise(REGISTER);
+
+    if(EVR_IRQ && SOFT_IRQ){
+        myprintf(ST_warning, 's', "Please choose one interrupt control option!");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Interrupt Control Mode: ");
+    if(EVR_IRQ) myprintf(ST_attention, 's', "EVR_IRQ");
+    if(SOFT_IRQ) myprintf(ST_attention, 's', "EVR_IRQ");
 
     #if TESTMODE
         printf("Packet Collection Parameters\n");
         printf("Estimated Packet Traffic per Box: %d pps\n", PACKET_MAX);
         printf("Capture Duration: %d\n", DURATION);
     #endif
-
     printf("\n");
 
-    printf("Number of Connected Sparks: \033[92m%d\033[0m\n", NO_SPARKS);
+    printf("Destination Configuration of Sparks\n");
+    printf("Local IP: ");
+    myprintf(ST_attention, 's', MY_IP_ADDR);
+    printf("Local Port: ");
+    myprintf(ST_attention, 'd', MY_PORT);
     printf("\n");
 
-    printf("Server Configuration\n");
-    printf("Server IP: %s\n", IP_ADDR);
-    printf("Server Port: %d\n", PORT);
-
-    if(EVR_IRQ && SOFT_IRQ){
-        printf("%s\n", "\033[91mPlease choose one interrupt control option!\033[0m"); 
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Interrupt Control Mode: ");
-    if(EVR_IRQ) printf("\033[92mEVR_IRQ\033[0m");
-    if(SOFT_IRQ) printf("\033[92mSOFT_IRQ\033[0m");
+    printf("Sending Concentrated BPM Data to:\n");
+    printf("Remote IP: ");
+    myprintf(ST_attention, 's', dest_ip);
+    printf("Remote Port: ");
+    myprintf(ST_attention, 'd', dest_port);
     printf("\n");
-    
-    printf("CPU core selection for multithreading: CPU %d\n", CPU_CORE);
+
+    printf("Number of Connected Sparks: ");
+    myprintf(ST_attention, 'd', NO_SPARKS);
+    printf("Current BPM Section Selection: ");
+    myprintf(ST_attention, 's', select_bpms);
+    printf("Dumping concentrated packet payload: ");
+    humanise(debug_payload);
+    printf("\n");
+
+    printf("CPU core selection for IRQ handling: CPU %d\n", CPU_CORE);
 
     printf("---------------------------------------\n");
     
@@ -210,34 +229,65 @@ void display_current_config(void) {
     sleep(1);   // Give people some time to digest this
 }
 
-/* Usage ./irq-capture <ip> <port> <addressbook> 
-    e.g. ./irq-capture 192.168.21.34 2049 c1s1s14g */
+
+void parse_command_arguments(int argc, char *argv[]){
+    int command;
+
+    while ((command = getopt (argc, argv, "i:p:b:hdl")) != -1){
+        switch (command){    
+            case 'h':
+                printhelp();
+                break; 
+            case 'd':
+                debug_payload = 1;
+                break;
+            case 'l':
+                list_addressbooks();
+                exit(EXIT_SUCCESS);
+                break;
+            case 'i':
+                dest_ip = optarg;
+                break;
+            case 'p':
+                dest_port = atoi(optarg);
+                break;
+            case 'b':
+                select_bpms = optarg;
+                break;
+            case '?':
+                if (optopt == 'c')
+                    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                else if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+                exit(EXIT_FAILURE);
+        default:
+            abort();
+        }
+    }
+    // printf("Commandline: dest_ip = %s, dest_port = %d, bpm section selection = %s debug = %d\n",
+    //         dest_ip, dest_port, select_bpms, debug_payload);
+}
+
+
 int main(int argc, char *argv[]){   
 
-    char *remote_addr = DEFAULT_ADDR;
-    int remote_port = DEFAULT_PORT;
-    char *select_book = "c1s1s14g";     // for the test phase, hardcode it
+    dest_ip = DEFAULT_ADDR;
+    dest_port = DEFAULT_PORT;
+    select_bpms = DEFAULT_BPM_SELECTION; 
+    debug_payload = DEFAULT_DEBUG;
 
-    if (argc == 3){
-        remote_addr = argv[1];
-        sscanf(argv[2], "%d", &remote_port);
-    }
-
-    if (argc == 4){
-        remote_addr = argv[1];
-        sscanf(argv[2], "%d", &remote_port);
-        select_book = argv[3];
-    }
-
+    parse_command_arguments(argc, argv);  
     display_current_config(); 
-
+    
     /********************************************/
     /* Packet Collection                        */
     /********************************************/
     static struct packetRecord packet;   
     struct bookKeeper spark_bookkeeper;
    // init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);      // HERE
-    init_bookkeeper(&spark_bookkeeper, select_book);
+    init_bookkeeper(&spark_bookkeeper, select_bpms);
     print_addressbook(&spark_bookkeeper);
 
     /* TEST MODE */
@@ -261,9 +311,7 @@ int main(int argc, char *argv[]){
     #endif
 
     /********************************************/
-    /* Socket for Reception to collect from     */
-    /*  Sparks and Client parameters            */
-    /*                                          */
+    /* Socket to collect from Sparks            */
     /********************************************/
     int sock_collection; 
     struct sockaddr_in receive_server;
@@ -282,7 +330,7 @@ int main(int argc, char *argv[]){
     int buf[PAYLOAD_FIELDS];
 
     /********************************************/                  
-    /* Socket to collect concentrated packets   */
+    /* Socket to send all concentrated packets  */
     /********************************************/
     int sock_concentrated;
     struct sockaddr_in transmit_server;
@@ -293,9 +341,9 @@ int main(int argc, char *argv[]){
     }
 
     /* Set up the server name */
-    transmit_server.sin_family      = AF_INET;               /* Internet Domain     */
-    transmit_server.sin_port        = htons(remote_port);     /* Server Port        */
-    transmit_server.sin_addr.s_addr = inet_addr(remote_addr); /* Server's Address   */
+    transmit_server.sin_family      = AF_INET;             
+    transmit_server.sin_port        = htons(dest_port);    
+    transmit_server.sin_addr.s_addr = inet_addr(dest_ip); 
 
     /*******************************************************************************/
     /* MAIN */

@@ -15,8 +15,8 @@ int prepare_socket(struct sockaddr_in server) {
     
     /* Bind server to this socket.*/
     server.sin_family      = AF_INET;       /* Server is in Internet Domain */
-    server.sin_port        = htons(PORT);         
-    server.sin_addr.s_addr = inet_addr(IP_ADDR); 
+    server.sin_port        = htons(MY_PORT);         
+    server.sin_addr.s_addr = inet_addr(MY_IP_ADDR); 
 
     if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0){
         perror("bind()");

@@ -30,4 +30,4 @@ $(TARGET): $(OBJ) $(DEPS)
 .PHONY: clean
 
 clean:
-	rm -f $(OBJ) *~
+	rm -f $(OBJ) *~ $(IDIR)/*.gch
