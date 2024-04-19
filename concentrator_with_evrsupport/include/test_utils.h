@@ -29,6 +29,7 @@
     #define print_debug_info(format, ...)  fprintf (stderr, format, ##__VA_ARGS__)
 #endif
 
+/* Print out formatting  */
 static const char green[] = "\033[92m";
 static const char blue[] = "\033[34m";
 static const char red[] = "\033[91m";
@@ -48,11 +49,11 @@ void humanise(int boolean);
 double get_elapsed_time_usec(struct timespec *tic, struct timespec *toc);
 int select_affinity(int core_id);
 void myprintf(int status, char f, char *yourstring);
-void printhelp();
+void printhelp(void);
 
 
-void printhelp(){
-    printf("usage: ./irq-capture [-i <dest_ip>] [-p <dest_port>] [-b <bpm_selection>] [-h] [-d]\n");
+void printhelp(void){
+    printf("usage: ./irq-capture [-i <dest_ip>] [-p <dest_port>] [-b <bpm_selection>] [-d] [-h] [-l]\n");
     printf("where: \n \t-h \tprint this help message\n");
     printf("\t-d \tdump compressed payload to stdout\n");
     printf("\t-l \tlist available address books\n");

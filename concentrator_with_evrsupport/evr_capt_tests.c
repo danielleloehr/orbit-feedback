@@ -96,13 +96,12 @@ void uio_read(){
     }
 }
 
-/* Queue must be Global */
+/* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
     /********************************************/
-    /* Payload Compression                      */
-    /* Payload :                                
+    /* Original Payload :                                
       vA | vB | vC | vD | Sum | Q | X | Y | LMT_l | LMT_h | res.| res.| res.| res.| res.| status
-        0|   1|   2|   3|    4|  5|  6|  7|      8|      9|    10|  11|   12|   13|   14|     15| */
+        0|   1|   2|   3|    4|  5|  6|  7|      8|      9|   10|   11|   12|   13|   14|     15|  */
     /********************************************/
     long long payload_sums[PAYLOAD_FIELDS];                         
     int compact_payload[PAYLOAD_FIELDS];
@@ -135,7 +134,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 }
             }                           
         }		
-
+        
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
             // Don't divide values = 0, and indices 8(LTM_h), 9(LTM_h) and 15(status)
@@ -149,7 +148,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         arrayXY_all[i] = compact_payload[6];
         arrayXY_all[i+7] = compact_payload[7];
 
-        /* If you want to send individual compact payload */
+        /* If you want to send individual compact payload, uncomment this */
         // sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
         if(debug_payload){
@@ -161,11 +160,6 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         // Always overwrite the buffer. 
         spark_bookkeeper->buffer_index[i] = 0;         
     }
-    //debug delete 
-    // for(int i=0; i < NO_SPARKS*2; i++){
-    //     printf("%d\t", arrayXY_all[i]);
-    // }
-    // printf("\n");
 
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
     sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
@@ -286,7 +280,7 @@ int main(int argc, char *argv[]){
     /********************************************/
     static struct packetRecord packet;   
     struct bookKeeper spark_bookkeeper;
-   // init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);      // HERE
+    //init_bookkeeper(&spark_bookkeeper, mtca1c1s1s14g_addressbook);
     init_bookkeeper(&spark_bookkeeper, select_bpms);
     print_addressbook(&spark_bookkeeper);
 
@@ -417,6 +411,7 @@ int main(int argc, char *argv[]){
     /* Never reach */
     /* Deallocate the socket*/
     close(sock_collection);
+    close(sock_concentrated);
 
     return 0;
 }
