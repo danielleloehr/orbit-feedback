@@ -25,7 +25,7 @@ iocInit()
 dbpf("mtca1c1s14gTest{evg-EvtClk}Source-Sel", "FracSyn (Int)")
 dbpf("mtca1c1s14gTest{evg-EvtClk}FracSynFreq-SP", "125.0")
 
-## Check if the event clock is correctly
+## Check if the event clock is set correctly
 #dbpr("mtca1c1s14gTest{evg-EvtClk}Frequency-RB")
 
 ## Enable EVRs
