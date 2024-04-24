@@ -1,13 +1,13 @@
 /*
  fa-capture under test
    VERSION 00.05.1  -- Richards version with mrfioc2 support
+                 ____________________                   __________________
+                |                    |                 |                  |
+ Spark 1..8 --->|  Concentrator CPU  |---compressed--->|   Remote Server  |
+                |      (Richard)     |      data       |  (dest IP/port)  | 
+                |____________________|                 |__________________|
 
-TODO
--rename spark_bookkeeper 
 
-   Open issues and TODOs (old not controlled)
-   - signal, EINTR
-   - array overflows
 */
 
 #include "test_utils.h"		// keep this here GNU_SOURCE
@@ -126,7 +126,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
 		
         for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
-                // Don't sum indices 8(LTM_h), 9(LTM_h) and 15(status), just use the fields of the latest packet
+                // Don't sum indices 8(LTM_l), 9(LTM_h) and 15(status), just use the fields of the latest packet
                 if (payload_ind == 8 || payload_ind == 9 || payload_ind == 15){
                     payload_sums[payload_ind] = queue[i][curr_ind].liberaData[payload_ind];      
                 }else{
@@ -137,7 +137,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         
         // Format it the way it was before
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
-            // Don't divide values = 0, and indices 8(LTM_h), 9(LTM_h) and 15(status)
+            // Don't divide values = 0, and indices 8(LTM_l), 9(LTM_h) and 15(status)
             if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){ 
                 compact_payload[ind] = (int) payload_sums[ind]; 
             }else{
