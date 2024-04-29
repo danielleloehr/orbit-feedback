@@ -57,8 +57,8 @@ void printhelp(void){
     printf("where: \n \t-h \tprint this help message\n");
     printf("\t-d \tdump compressed payload to stdout\n");
     printf("\t-l \tlist available address books\n");
-    printf("\t-i \tIP address of a remote host that receives the compressed BPM data\n");
-    printf("\t-p \tport of a remote host that receives the compressed BPM data\n");
+    printf("\t-i \tIP address of remote host that receives the compressed BPM data\n");
+    printf("\t-p \tport of remote host that receives the compressed BPM data\n");
     printf("\t-b \tBPM section to select the corresponding IP addressbook\n");
 
     exit(EXIT_SUCCESS);
