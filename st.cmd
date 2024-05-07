@@ -64,3 +64,8 @@ dbpf("mtca1c1s14gTest{evg-TrigEvt:1}EvtCode-SP", "125")
 dbpf("mtca1c1s14gTest{evg-TrigEvt:1}TrigSrc-Sel", "Front0")
 ## You should be able to observe interrupts in /proc/interrupts now
 
+## Internal event 0x01 at 1 Hz
+dbpf("mtca1c1s14gTest{evg-Mxc:1}Prescaler-SP", "125000000")
+dbpf("mtca1c1s14gTest{evg-Mxc:1}Frequency-RB", 1)
+dbpf("mtca1c1s14gTest{evg-TrigEvt:2}EvtCode-SP", "1")
+dbpf("mtca1c1s14gTest{evg-TrigEvt:2}TrigSrc-Sel", "Mxc1")
