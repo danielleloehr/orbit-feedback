@@ -101,7 +101,7 @@ void uio_read(){
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
     clock_gettime(CLOCK_MONOTONIC, &toc);
     // more than 1 second, reset the counter 
-    if((toc.tv_sec - tic.tv_sec) >= 2){
+    if((get_elapsed_time_usec) >=  2 * 1000 * 1000 ){
          GLOBAL_SEND_COUNTER = 0;
     }            
 
