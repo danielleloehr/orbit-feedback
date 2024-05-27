@@ -99,12 +99,11 @@ void uio_read(){
 
 /* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
-    GLOBAL_SEND_COUNTER++;
     clock_gettime(CLOCK_MONOTONIC, &toc);
     // more than 1 second, reset the counter 
-    if((toc.tv_sec - tic.tv_sec) >= 1){
-        GLOBAL_SEND_COUNTER = 0;
-    }                   
+    // if((toc.tv_sec - tic.tv_sec) >= 1){
+    //     GLOBAL_SEND_COUNTER = 0;
+    // }            
 
     /********************************************/
     /* Original Payload :                                
@@ -173,6 +172,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
     sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
+    GLOBAL_SEND_COUNTER++;  
     // tic 
     clock_gettime(CLOCK_MONOTONIC, &tic); 
 }
@@ -303,6 +303,7 @@ int main(int argc, char *argv[]){
     
     pthread_t irq_thread_id;
     GLOBAL_PACKET_COUNTER = 0;
+    GLOBAL_SEND_COUNTER = 0;
     
     /********************************************/
     /* Open EVR device                          */ 
