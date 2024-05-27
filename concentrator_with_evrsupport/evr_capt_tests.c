@@ -56,6 +56,7 @@ static int DEFAULT_DEBUG = 0;
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
+static int GLOBAL_SEND_COUNTER;
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -98,6 +99,13 @@ void uio_read(){
 
 /* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
+    GLOBAL_SEND_COUNTER++;
+    clock_gettime(CLOCK_MONOTONIC, &toc);
+    // more than 1 second, reset the counter 
+    if((toc.tv_sec - tic.tv_sec) >= 1){
+        GLOBAL_SEND_COUNTER = 0;
+    }                   
+
     /********************************************/
     /* Original Payload :                                
       vA | vB | vC | vD | Sum | Q | X | Y | LMT_l | LMT_h | res.| res.| res.| res.| res.| status
@@ -105,8 +113,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     /********************************************/
     long long payload_sums[PAYLOAD_FIELDS];                         
     int compact_payload[PAYLOAD_FIELDS];
-
-    int arrayXY_all[NO_SPARKS*2];
+    
+    int arrayXY_all[NO_SPARKS*2 + 2];
 
     for(int i=0; i < NO_SPARKS; i++){
         memset(payload_sums, 0 , sizeof(payload_sums));
@@ -147,7 +155,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
 
         arrayXY_all[i] = compact_payload[6];
         arrayXY_all[i+7] = compact_payload[7];
-
+        arrayXY_all[14] =  compact_payload[8];                 // LTM_l
+        arrayXY_all[15] =  GLOBAL_SEND_COUNTER;                // packet count param
         /* If you want to send individual compact payload, uncomment this */
         // sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
@@ -160,9 +169,12 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         // Always overwrite the buffer. 
         spark_bookkeeper->buffer_index[i] = 0;         
     }
-
+    
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
     sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
+
+    // tic 
+    clock_gettime(CLOCK_MONOTONIC, &tic); 
 }
 
 /* Print out curernt settings and relevant parameters */
