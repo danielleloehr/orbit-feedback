@@ -19,7 +19,8 @@ setup_device(){
         "evm")
             $CURR_PATH/evm_setup/st.cmd
             ;;
-        "all")
+        "full")
+            # run the default script in working directory
             $CURR_PATH/st.cmd
             ;;
         *)
@@ -32,7 +33,7 @@ setup_device(){
 usage="$(basename "$0") [-h] [-d <dev>] -- Run EPICS startup script of MRF device
 where:
     -h  show this help text
-    -d  select device (evr, evm)
+    -d  select device (evr, evm, full)
 "
 
 while getopts ":hd:" option; do

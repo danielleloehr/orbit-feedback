@@ -1,5 +1,8 @@
 #!../../bin/linux-x86_64/mrf
 
+#
+#  Default st.cmd script
+#
 < envPaths
 
 ## Register all support components
@@ -12,12 +15,13 @@ epicsEnvSet("EVR_SECTION", "EVR1-1W1S14G")
 epicsEnvSet("EVM_SECTION", "EVM1-1W1S14G")  
 epicsEnvSet("ES", ":")        
 epicsEnvSet("FREQ", "125")
+epicsEnvSet("dsh", ":")
 
 epicsEnvSet("EPICS_CA_MAX_ARRAY_BYTES","1000000")
 
 ## Setup EVR
 mrmEvrSetupPCI("EVR1","$(EVR1_PCI)")
-dbLoadRecords("../../db/evr-mtca-300u.db", "P=$(EVR_SECTION):, ES=$(ES), EVR=EVR1")
+dbLoadRecords("../../db/evr-mtca-300u.db", "P=$(EVR_SECTION), dsh=$(dsh), ES=$(ES), EVR=EVR1")
 
 ## Setup EVM
 mrmEvgSetupPCI("EVM", "$(EVM_PCI)")		

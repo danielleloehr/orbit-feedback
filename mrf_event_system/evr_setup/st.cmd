@@ -12,13 +12,14 @@ epicsEnvSet("EVR_PCI", "07:00.0")
 epicsEnvSet("EVR_SECTION", "EVR1-1W1S14G")  
 epicsEnvSet("ES", ":")       
 epicsEnvSet("FREQ", "125")
+epicsEnvSet("dsh", ":")
 #######################################################
 
 epicsEnvSet("EPICS_CA_MAX_ARRAY_BYTES","1000000")
 
 ## Setup EVR
 mrmEvrSetupPCI("EVR1","$(EVR1_PCI)")
-dbLoadRecords("../../db/evr-mtca-300u.db", "P=$(EVR_SECTION), ES=$(ES), EVR=EVR1")
+dbLoadRecords("../../db/evr-mtca-300u.db", "P=$(EVR_SECTION), dsh=$(dsh), ES=$(ES), EVR=EVR1")
 
 ## To setup a second EVR
 #epicsEnvSet("EVR2_PCI", "05:00.0")
