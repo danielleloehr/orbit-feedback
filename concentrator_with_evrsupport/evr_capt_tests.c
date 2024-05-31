@@ -23,7 +23,7 @@
 #define REGISTER 		    1
 #define EVR_IRQ             1
 #define SOFT_IRQ            0
-#define CPU_CORE            1
+#define CPU_CORE            2           // IMPORTANT: original value was 1 when taskset ran on CPU2. -> changing this to CPU2. 
 #define ALARM_USEC       	6666.66
 
 #define TESTMODE            0
@@ -31,11 +31,12 @@
 /******************************/
 
 /* Please adjust these parameters carefully */
-/* queue size per Spark  */
+/* Queue size per Spark  */
 #define MAX_BUFF_SIZE 1000000       
-/* an estimated value for averaging in the case of an overflow */
+/* An estimated number of packets for averaging in the case of an overflow */
 #define EST_PACKET_COUNT 10000      
 
+/* Global packet queue */
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];       
 
 static volatile int send_data;
@@ -110,18 +111,21 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
       vA | vB | vC | vD | Sum | Q | X | Y | LMT_l | LMT_h | res.| res.| res.| res.| res.| status
         0|   1|   2|   3|    4|  5|  6|  7|      8|      9|   10|   11|   12|   13|   14|     15|  */
     /********************************************/
-    long long payload_sums[PAYLOAD_FIELDS];                         
-    int compact_payload[PAYLOAD_FIELDS];
     
-    int arrayXY_all[NO_SPARKS*2 + 2];
+    long long payload_sums[PAYLOAD_FIELDS];     /* A big enough array to hold sums */
+    int compact_payload[PAYLOAD_FIELDS];        /* An array for the averaged sums */  
+    int arrayXY_all[NO_SPARKS*2 + 2];           /* Format of the output array */
 
-    for(int i=0; i < NO_SPARKS; i++){
-        memset(payload_sums, 0 , sizeof(payload_sums));
+    /* Per Spark, sequential averaging */
+    for(int i = 0; i < NO_SPARKS; i++){
+        memset(payload_sums, 0 , sizeof(payload_sums));  // NOTE <-- This creates an 0 array!!!
 
-        // Overwrite the count value if there was an overflow to average over only the latest packets in the full queue
+        /********************************************/
+        /* Overflow protection                      */
+        /* Overwrite the count value if there was an overflow to average over only the latest packets in the full queue */
         int buffer_overflow = spark_bookkeeper->count_per_libera[i] - MAX_BUFF_SIZE;    
         if(buffer_overflow >= 0 ){
-            printf("WARNING: Buffer overflow (or edge condition) is reported.\n");
+            print_debug_info("WARNING: Buffer overflow (or edge condition) is reported.\n");
             if(!(buffer_overflow % MAX_BUFF_SIZE)){
                 print_debug_info("DEBUG: Edge Cond. Averaging over MAX_BUFF_SIZE (=%d)\n", MAX_BUFF_SIZE);
                 spark_bookkeeper->count_per_libera[i] = MAX_BUFF_SIZE;
@@ -130,7 +134,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 spark_bookkeeper->count_per_libera[i] = EST_PACKET_COUNT;
             }
         }
-		
+		/********************************************/
+
         for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
                 // Don't sum indices 8(LTM_l), 9(LTM_h) and 15(status), just use the fields of the latest packet
@@ -156,6 +161,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         arrayXY_all[i+7] = compact_payload[7];
         arrayXY_all[14] =  compact_payload[8];                 // LTM_l
         arrayXY_all[15] =  GLOBAL_SEND_COUNTER;                // packet count param
+
         /* If you want to send individual compact payload, uncomment this */
         // sendto(trans_sock, compact_payload, sizeof(compact_payload), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
@@ -163,10 +169,9 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
             print_payload(compact_payload);
         }
 
-        // Clean up
-        spark_bookkeeper->count_per_libera[i] = 0;
-        // Always overwrite the buffer. 
-        spark_bookkeeper->buffer_index[i] = 0;         
+        /* Housekeeping */
+        spark_bookkeeper->count_per_libera[i] = 0;      // Clean the current packet count
+        spark_bookkeeper->buffer_index[i] = 0;          // Always overwrite the buffer      
     }
     
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
@@ -279,11 +284,21 @@ void parse_command_arguments(int argc, char *argv[]){
 
 int main(int argc, char *argv[]){   
 
+    /********************************************/
+    /* General configuration settings           */
+    /********************************************/
     dest_ip = DEFAULT_ADDR;
     dest_port = DEFAULT_PORT;
     select_bpms = DEFAULT_BPM_SELECTION; 
     debug_payload = DEFAULT_DEBUG;
 
+    /********************************************/
+    /* DEBUG: Counters for statistics           */
+    /********************************************/
+    GLOBAL_PACKET_COUNTER = 0;
+    GLOBAL_SEND_COUNTER = 0;
+
+    /* Display start configuration */
     parse_command_arguments(argc, argv);  
     display_current_config(); 
     
@@ -300,10 +315,6 @@ int main(int argc, char *argv[]){
     #if TESTMODE
         int packet_limit = PACKET_MAX * DURATION * NO_SPARKS;
     #endif
-    
-    pthread_t irq_thread_id;
-    GLOBAL_PACKET_COUNTER = 0;
-    GLOBAL_SEND_COUNTER = 0;
     
     /********************************************/
     /* Open EVR device                          */ 
@@ -359,7 +370,10 @@ int main(int argc, char *argv[]){
         printf("sec, nanosec\n");
     #endif
 
-    /* Start thread for interrupt handling */ 
+    /********************************************/ 
+    /* Interrupt handling                       */
+    /********************************************/ 
+    pthread_t irq_thread_id;
     #if(EVR_IRQ)
         print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
         pthread_create(&irq_thread_id, NULL, (void *) uio_read, NULL);
@@ -380,6 +394,7 @@ int main(int argc, char *argv[]){
         if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, (socklen_t *) &client_addr_size) >= 0){
             /* Record the packet */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
+            /* Increase global counter */
             GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF
@@ -388,9 +403,8 @@ int main(int argc, char *argv[]){
                 // printf("%.5f\n",(double)packet.arrival.tv_sec + 1.0e-9 * packet.arrival.tv_nsec);  
             #endif
 
-           
             #if REGISTER
-                memcpy(packet.liberaData, buf, PAYLOAD_FIELDS*sizeof(int));  
+                memcpy(packet.liberaData, buf, PAYLOAD_FIELDS*sizeof(int));  // NOTE <- ONLY WRITE OPERATION
                 packet.src_port = ntohs(client.sin_port);
                 packet.id = client.sin_addr.s_addr; 
 
@@ -412,7 +426,8 @@ int main(int argc, char *argv[]){
         }else{
             perror("recvfrom()");
             if(errno == EINTR){
-                // Check how often we end up here with mrfioc2. Priority : Not urgent
+                // IMPORTANT: Check if the zero-byte packets happen after this call!!!
+                print_debug_info("DEBUG: Interrupted system call\n");
                 continue;
             }else {
                 // all other errors
