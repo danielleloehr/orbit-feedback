@@ -23,9 +23,10 @@ sockets.o : $(IDIR)/sockets.c $(IDIR)/sockets.h
 evr_capt_tests.o: evr_capt_tests.c $(DEPS)
 	$(CC) $(CFLAGS) -c $^ -I$(IDIR)
 
-# Build irq-capture 
+# Build irq-capture and do housekeeping
 $(TARGET): $(OBJ) $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $^  -lpthread
+	rm -f *~ $(IDIR)/*.gch
 
 .PHONY: clean
 
