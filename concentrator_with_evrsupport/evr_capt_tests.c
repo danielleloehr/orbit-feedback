@@ -135,7 +135,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
             }
         }
 		/********************************************/
-
+        /* Go through the packet queue of Spark(#i) */
         for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
             for(int payload_ind = 0; payload_ind < PAYLOAD_FIELDS; payload_ind++){
                 // Don't sum indices 8(LTM_l), 9(LTM_h) and 15(status), just use the fields of the latest packet

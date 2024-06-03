@@ -8,8 +8,8 @@
 #include <unistd.h>     // close()
 
 
-static char IP_ADDR[16] = "192.168.2.200";//"192.168.2.22";       /* Server's Internet Address  */
-static int PORT = 2049;                         /* Libera default port      */
+static char IP_ADDR[16] = "10.42.0.1";//"192.168.2.22";       /* Server's Internet Address  */
+static int PORT = 12345;                         /* Libera default port      */
 static int PACKET_MAX = 1000;                   /* Number of packets to accept until socket is closed*/
 
 
@@ -77,11 +77,16 @@ int main (){
 
     
     memcpy(liberaData, buf, 16*sizeof(int));
+    if(liberaData[0]==0){
+	    printf("It is 0\n");
+    }
+    /*else{
     for(int i= 0; i<16; i++){
         printf("%d\t", liberaData[i]);
         
     }
-    printf("\n");
+    } */
+    //printf("\n");
     //hexdumpunformatted(buf, 64);            //this actually works 
     
     }   
