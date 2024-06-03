@@ -12,3 +12,4 @@ tests/zmq_server
 tests/zmq_simple_server.o
 tests/zmq_simple_server.c
 tests/zmq_server
+tests/listen
