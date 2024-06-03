@@ -338,14 +338,23 @@ int main(int argc, char *argv[]){
         perror("Socket binding failed. Exiting now..\n");
         exit(EXIT_FAILURE);
     }
-    /**/
-	long extend_buffer = 16777216;
-	setsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF,&extend_buffer, sizeof(long)); 
+    /********************************************/
+    /* Adjust receive buffer                    */
+    /* CAREFUL: this requires net.core.rmem_max */
+    /*  tuning (set to 16777216)                */
+    /********************************************/
+    print_debug_info("TEST: Adjusting the socket buffer\n");
 
-    int client_addr_size;
-    struct sockaddr_in client;
-    client_addr_size = sizeof(client);
-    int buf[PAYLOAD_FIELDS];
+    int recvbuff;
+    socklen_t optlen;
+    getsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &recvbuff, &optlen);
+    print_debug_info("TEST: Current size (old) of receive buffer %d\n", recvbuff);
+
+    /* CAREFUL: This value will be doubled. Make sure rmem_max is at least 2x(extenbuff) */
+    int extendbuff = 8388608;       // Don't use long extend_buffer = 16777216; 
+	setsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &extendbuff, sizeof(extendbuff)); 
+    getsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &recvbuff, &optlen);
+    print_debug_info("TEST: Current size (new) of receive buffer %d\n", recvbuff);
 
     /********************************************/                  
     /* Socket to send all concentrated packets  */
@@ -362,6 +371,14 @@ int main(int argc, char *argv[]){
     transmit_server.sin_family      = AF_INET;             
     transmit_server.sin_port        = htons(dest_port);    
     transmit_server.sin_addr.s_addr = inet_addr(dest_ip); 
+
+    /********************************************/   
+    /* More parameters for reception            */
+    /********************************************/  
+    int client_addr_size;
+    struct sockaddr_in client;
+    client_addr_size = sizeof(client);
+    int buf[PAYLOAD_FIELDS];
 
     /*******************************************************************************/
     /* MAIN */
