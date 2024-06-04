@@ -127,6 +127,8 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
 
     if(is_everyone_off > 3){
         print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
+        print_debug_info("\t\t Was it Spark 0? (Packet count [0] = %d, Average = %d)\n", 
+            spark_bookkeeper->count_per_libera[0], avg_packet_cnt);
     }
 
 }
