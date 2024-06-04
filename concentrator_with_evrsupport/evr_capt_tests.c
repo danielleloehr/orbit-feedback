@@ -58,6 +58,7 @@ static int DEFAULT_DEBUG = 0;
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
+static int insist_warning;
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -105,27 +106,28 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     /* Tolerate a difference of 1. We are working sequantially,
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
-    int is_everyone_off = 0, latest_zero_packet = 0, insist_warning = 0;
+    int is_everyone_off = 0, latest_zero_packet = 0;
 
-    for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-        /* Underperformed */
-        if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
-            is_everyone_off++;
-            print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
-                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
-                spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
-        }
-        if(is_everyone_off > 3){
-            print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
-        }
-        /* Done nothing */
-        else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-            print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
-                box_ind, GLOBAL_SEND_COUNTER);
-            latest_zero_packet = GLOBAL_SEND_COUNTER;
-            insist_warning = 1;
-        }
-    }
+    // for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
+    //     /* Underperformed */
+    //     if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
+    //         is_everyone_off++;
+    //         print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
+    //             box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
+    //             spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
+    //     }
+    //     if(is_everyone_off > 3){
+    //         print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+    //     }
+    //     /* Done nothing */
+    //     else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
+    //         print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
+    //             box_ind, GLOBAL_SEND_COUNTER);
+    //         latest_zero_packet = GLOBAL_SEND_COUNTER;
+    //         insist_warning = 1;
+    //     }
+    // }
+    
     /* Print latest zero packet continuously */
     if(insist_warning){
         print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
@@ -149,6 +151,26 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
 
     /* Per Spark, sequential averaging */
     for(int i = 0; i < NO_SPARKS; i++){
+        /* Will it affect the latency if we print statistics here? */
+        /* Debug: Check if anyone is underperforming */
+        /* Underperformed */
+        if(spark_bookkeeper->count_per_libera[i] < threshold){
+            is_everyone_off++;
+            print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
+                i, spark_bookkeeper->count_per_libera[i]-avg_packet_cnt, 
+                spark_bookkeeper->count_per_libera[i] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
+        }
+        if(is_everyone_off > 3){
+            print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+        }
+        /* Done nothing */
+        else if(spark_bookkeeper->count_per_libera[i] == 0){
+            print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
+                i, GLOBAL_SEND_COUNTER);
+            latest_zero_packet = GLOBAL_SEND_COUNTER;
+            insist_warning = 1;
+        }
+
         memset(payload_sums, 0 , sizeof(payload_sums));  // NOTE <-- This creates an 0 array!!!
 
         /********************************************/
@@ -165,6 +187,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 spark_bookkeeper->count_per_libera[i] = EST_PACKET_COUNT;
             }
         }
+
 		/********************************************/
         /* Go through the packet queue of Spark(#i) */
         for(int curr_ind = 0; curr_ind < spark_bookkeeper->count_per_libera[i]; curr_ind++){ 
@@ -178,7 +201,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
             }                           
         }		
         
-        // Format it the way it was before
+        /* Format compact payload for sending */
         for(int ind = 0; ind< PAYLOAD_FIELDS; ind++){
             // Don't divide values = 0, and indices 8(LTM_l), 9(LTM_h) and 15(status)
             if(payload_sums[ind] == 0 || ind == 8 || ind == 9 || ind == 15){ 
@@ -328,6 +351,7 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
+    insist_warning = 0;
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
