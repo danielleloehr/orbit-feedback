@@ -437,7 +437,7 @@ int main(int argc, char *argv[]){
 
     while(1){
         if(send_data){
-            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server, latest_zero_packet);
+            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server, int latest_zero_packet);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
