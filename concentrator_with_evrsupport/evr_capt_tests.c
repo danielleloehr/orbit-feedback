@@ -106,6 +106,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
     int is_everyone_off = 0;
+    int latest_zero_packet = 0;
+
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
@@ -115,18 +117,18 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
         if(is_everyone_off > 3){
-            print_debug_info("WARNING: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+            print_debug_info("STATS Half of the boxes performed below average. Someone sent too many packets!!!\n");
+        }
+        /* Insist */
+        if(latest_zero_packet){
+            print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
         }
 
-        /* Overperformed */
-      //  else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
-      //      print_debug_info("STATS: Spark %d sent %d more packets than average (= %d)\n", 
-      //          box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);    
-      //  }
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
             print_debug_info("\nWARNING: No packets were received from Spark %d\n !!! Collection no.", 
                 box_ind, GLOBAL_SEND_COUNTER);
+            latest_zero_packet = GLOBAL_SEND_COUNTER;
         }
     }
 
