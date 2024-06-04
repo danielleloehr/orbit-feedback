@@ -99,16 +99,14 @@ void uio_read(){
 }
 
 /* Careful: queue must be global */
-void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server, int latest_zero_packet){
+void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
     /* Debug: Check if anyone is underperforming */
     int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
     /* Tolerate a difference of 1. We are working sequantially,
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
-    int is_everyone_off = 0;
-    
-    /* If you don't want to insist */
-    //latest_zero_packet = 0;
+    int is_everyone_off = 0, latest_zero_packet = 0, insist_warning = 0;
+
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
@@ -120,17 +118,17 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         if(is_everyone_off > 3){
             print_debug_info("STATS Half of the boxes performed below average. Someone sent too many packets!!!\n");
         }
-        /* Insist */
-        if(latest_zero_packet){
-            print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
-        }
-
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-            print_debug_info("\nWARNING: No packets were received from Spark %d\n !!! Collection no.", 
+            print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                 box_ind, GLOBAL_SEND_COUNTER);
             latest_zero_packet = GLOBAL_SEND_COUNTER;
+            insist_warning = 1;
         }
+    }
+    /* Print latest zero packet continuously */
+    if(insist_warning){
+        print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
     }
 
     clock_gettime(CLOCK_MONOTONIC, &toc);
@@ -330,8 +328,6 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
-    /* Set this here to insist on printing */
-    int latest_zero_packet = 0;
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
@@ -438,7 +434,7 @@ int main(int argc, char *argv[]){
 
     while(1){
         if(send_data){
-            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server, latest_zero_packet);
+            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
