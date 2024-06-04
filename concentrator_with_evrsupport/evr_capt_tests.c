@@ -23,7 +23,7 @@
 #define REGISTER 		    1
 #define EVR_IRQ             1
 #define SOFT_IRQ            0
-#define CPU_CORE            2           // IMPORTANT: original value was 1 when taskset ran on CPU2. -> changing this to CPU2. 
+#define CPU_CORE            1           // IMPORTANT: original value was 1 when taskset ran on CPU2. -> changing this to CPU2. 
 #define ALARM_USEC       	6666.66
 
 #define TESTMODE            0
@@ -108,8 +108,9 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
-            print_debug_info("STATS: Spark %d sent %d fewer packets than average (= %d)\n", 
-                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
+            print_debug_info("STATS: Spark %d sent %d fewer packets than average ( %d < %d). Collection no. %d\n", 
+                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
+                spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
         /* Overperformed */
       //  else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
@@ -118,7 +119,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
       //  }
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-            print_debug_info("\nWARNING: No packets were received from Spark %d\n !!!", box_ind);
+            print_debug_info("\nWARNING: No packets were received from Spark %d\n !!! Collection no.", 
+                box_ind, GLOBAL_SEND_COUNTER);
         }
     }
 
