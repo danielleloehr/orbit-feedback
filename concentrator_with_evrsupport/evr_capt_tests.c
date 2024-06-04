@@ -106,7 +106,9 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
     int is_everyone_off = 0;
-
+    
+    /* If you don't want to insist */
+    // latest_zero_packet = 0;
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
