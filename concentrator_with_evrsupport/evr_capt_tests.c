@@ -99,7 +99,7 @@ void uio_read(){
 }
 
 /* Careful: queue must be global */
-void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server, latest_zero_packet){
+void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server, int latest_zero_packet){
     /* Debug: Check if anyone is underperforming */
     int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
     /* Tolerate a difference of 1. We are working sequantially,
@@ -437,7 +437,7 @@ int main(int argc, char *argv[]){
 
     while(1){
         if(send_data){
-            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server, int latest_zero_packet);
+            compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server, latest_zero_packet);
             send_data = 0;
             GLOBAL_PACKET_COUNTER = 0;
         }  
