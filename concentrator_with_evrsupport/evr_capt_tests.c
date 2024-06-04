@@ -108,7 +108,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     int is_everyone_off = 0;
     
     /* If you don't want to insist */
-    // latest_zero_packet = 0;
+    //latest_zero_packet = 0;
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
@@ -330,6 +330,8 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
+    /* Set this here to insist on printing */
+    int latest_zero_packet = 0;
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
@@ -412,9 +414,6 @@ int main(int argc, char *argv[]){
     struct sockaddr_in client;
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
-
-    /* Set this here to insist on printing */
-    int latest_zero_packet = 0;
 
     /*******************************************************************************/
     /* MAIN */
