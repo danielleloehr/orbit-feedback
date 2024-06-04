@@ -92,7 +92,7 @@ void uio_read(){
     int irq_count;
     while(1){
         if(read(evr_fd, &irq_count, 4) == 4){
-           print_debug_info("DEBUG: IRQ received. Packet count : %d\n", GLOBAL_PACKET_COUNTER);
+           //print_debug_info("DEBUG: IRQ received. Packet count : %d\n", GLOBAL_PACKET_COUNTER);
            send_data = 1;
         }
     }
@@ -100,6 +100,20 @@ void uio_read(){
 
 /* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
+    /* Debug statistics */ 
+    /* Check if anyone under-performed before concentration */
+    int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
+    print_debug_info("STATS: Average packet count %d\n", avg_packet_cnt);
+    
+    for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
+        if(spark_bookkeeper->count_per_libera[box_ind] < avg_packet_cnt){
+            print_debug_info("STATS: Spark %d\n sent %d fewer packets than average (= %d)\n", 
+                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
+        }else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
+            print_debug_info("WARNING: No packets were received from Spark %d\n !!!", box_ind);
+        }
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &toc);
     // more than 1 second, reset the counter 
     if((toc.tv_sec - tic.tv_sec) >= 2){
