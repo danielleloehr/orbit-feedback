@@ -112,9 +112,6 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
                 box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
                 spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
-        if(is_everyone_off > 3){
-            print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
-        }
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
@@ -127,7 +124,10 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
             print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
         }
     }
-
+    
+    if(is_everyone_off > 3){
+        print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+    }
 
 }
 
