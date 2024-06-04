@@ -105,13 +105,19 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     /* Tolerate a difference of 1. We are working sequantially,
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
+    int is_everyone_off = 0;
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
         if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
-            print_debug_info("STATS: Spark %d sent %d fewer packets than average ( %d < %d). Collection no. %d\n", 
+            is_everyone_off++;
+            print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
                 box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
                 spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
+        if(is_everyone_off > 3){
+            print_debug_info("WARNING: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+        }
+
         /* Overperformed */
       //  else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
       //      print_debug_info("STATS: Spark %d sent %d more packets than average (= %d)\n", 
