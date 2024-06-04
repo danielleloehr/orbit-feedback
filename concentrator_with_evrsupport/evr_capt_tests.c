@@ -58,7 +58,6 @@ static int DEFAULT_DEBUG = 0;
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
-static int insist_warning;
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -121,14 +120,15 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                 box_ind, GLOBAL_SEND_COUNTER);
             latest_zero_packet = GLOBAL_SEND_COUNTER;
-            insist_warning = 1;
+        }
+
+        /* Print latest zero packet continuously */
+        if(latest_zero_packet){
+            print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
         }
     }
 
-    /* Print latest zero packet continuously */
-    if(insist_warning){
-        print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
-    }
+
 }
 
 /* Careful: queue must be global */
@@ -331,7 +331,6 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
-    insist_warning = 0;
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
