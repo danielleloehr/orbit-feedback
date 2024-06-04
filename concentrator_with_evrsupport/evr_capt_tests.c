@@ -104,33 +104,42 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
     int threshold = avg_packet_cnt - 1;  /* Tolerate a difference of 1. We are working sequantially. */
     int is_everyone_off = 0, latest_zero_packet = 0;
 
+    char statistics[64] = "";
+    int pos;
+
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-        /* Underperformed */
-        if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
-            is_everyone_off++;
-            print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
-                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
-                spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
-        }
-        /* Done nothing */
-        else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
+        /* Save the counters into a string */
+        pos += sprintf(&statistics[pos], "\t[%d]=%d", box_ind, spark_bookkeeper->count_per_libera[box_ind]);
+
+         /* Done nothing */
+        if(spark_bookkeeper->count_per_libera[box_ind] == 0){
             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                 box_ind, GLOBAL_SEND_COUNTER);
             latest_zero_packet = GLOBAL_SEND_COUNTER;
-        }
-
-        /* Print latest zero packet continuously */
-        if(latest_zero_packet){
-            print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
+            is_everyone_off++;
+        }else 
+            /* Underperformed */
+            if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
+                is_everyone_off++;
+                print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
+                    box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
+                    spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
     }
 
+     /* Increase verbosity if more than 3 Sparks are not performing ideally*/
     if(is_everyone_off > 3){
         print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
-        print_debug_info("\t\t Was it Spark 0? (Packet count [0] = %d, Average = %d)\n", 
-            spark_bookkeeper->count_per_libera[0], avg_packet_cnt);
+        print_debug_info("STATS: Counters %s\t (average %d)\n", statistics, avg_packet_cnt);
+        //print_debug_info("\t\t\t\t Spark 0? (Packet count [0] = %d, Average = %d)\n", spark_bookkeeper->count_per_libera[0], avg_packet_cnt);
     }
 
+    /* Print latest zero packet at the end */
+    if(latest_zero_packet){
+        print_debug_info("---------------------------------------------------\n");
+        print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
+        print_debug_info("---------------------------------------------------\n");
+    }  
 }
 
 /* Careful: queue must be global */
