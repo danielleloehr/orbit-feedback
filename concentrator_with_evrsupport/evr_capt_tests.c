@@ -58,9 +58,6 @@ static int DEFAULT_DEBUG = 0;
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
-/* Global packet performance counter */
-/* Note: Please only use for statistics and debugging */
-static int GLOBAL_PERFORMANCE[NO_SPARKS]; 
 
 /* Universal tick-tock structs for timing needs     */
 /* CAREFUL: 
@@ -97,57 +94,33 @@ void uio_read(){
         if(read(evr_fd, &irq_count, 4) == 4){
            //print_debug_info("DEBUG: IRQ received. Packet count : %d\n", GLOBAL_PACKET_COUNTER);
            send_data = 1;
-
-           get_statistics_per_box(GLOBAL_PERFORMANCE);
         }
     }
-}
-
-
-void init_tabular_statistics(){
-    printf("STATS:\n");
-    /* Make table */
-    printf("Spark ID: ");
-
-    for(int i = 0 ; i < NO_SPARKS; i++){
-        printf("\t[ %d ]", i);
-    }
-    printf("\n");
-}
-
-void get_statistics_per_box(int counter[]){
-    /* Debug statistics */ 
-    /* Check if anyone under-performed before concentration */
-    int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
-    int performance [NO_SPARKS];
-
-    printf("\t\t\t");
-
-    for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-        if(counter[box_ind] == 0){
-            print_debug_info("WARNING: No packets were received from Spark %d\n !!!", box_ind);
-        }
-        performance[box_ind] = counter[box_ind] - avg_packet_cnt;   
-        printf("\t%d", performance[box_ind]);
-    }
-    
 }
 
 /* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
-    /* Very simple way to get statistics */
-    /* 
-        int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
-        for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-            // Tolerate a difference of 1
-            if(spark_bookkeeper->count_per_libera[box_ind] < avg_packet_cnt-1){
-                print_debug_info("STATS: Spark %d sent %d fewer packets than average (= %d)\n", 
-                    box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
-            }else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-                print_debug_info("WARNING: No packets were received from Spark %d\n !!!", box_ind);
-            }
+    /* Debug: Check if anyone is underperforming */
+    int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
+    /* Tolerate a difference of 1. We are working sequantially,
+        this is very much possible */
+    int threshold = avg_packet_cnt - 1;
+    for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
+        /* Underperformed */
+        if(spark_bookkeeper->count_per_libera[box_ind] < threshold){
+            print_debug_info("STATS: Spark %d sent %d fewer packets than average (= %d)\n", 
+                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
         }
-    */
+        /* Overperformed */
+        else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
+            print_debug_info("STATS: Spark %d sent %d more packets than average (= %d)\n", 
+                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);    
+        }
+        /* Done nothing */
+        else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
+            print_debug_info("\nWARNING: No packets were received from Spark %d\n !!!", box_ind);
+        }
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &toc);
     // more than 1 second, reset the counter 
@@ -220,8 +193,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
 
         /* Housekeeping */
         spark_bookkeeper->count_per_libera[i] = 0;      // Clean the current packet count
-        spark_bookkeeper->buffer_index[i] = 0;          // Always overwrite the buffer      
-        GLOBAL_PERFORMANCE[i] = 0;                      // Clean statistics
+        spark_bookkeeper->buffer_index[i] = 0;          // Always overwrite the buffer     
     }
     
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
@@ -437,9 +409,6 @@ int main(int argc, char *argv[]){
         printf("sec, nanosec\n");
     #endif
 
-    /* TEST */
-    init_tabular_statistics();
-
     /********************************************/ 
     /* Interrupt handling                       */
     /********************************************/ 
@@ -481,8 +450,6 @@ int main(int argc, char *argv[]){
                 for(int i=0; i<NO_SPARKS; i++){
                     if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
                         spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
-                        /* TEST: Update the global packet counters */
-                        GLOBAL_PERFORMANCE[i] = spark_bookkeeper.count_per_libera[i];
                         // Check the buffer limits                                 
                         if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
