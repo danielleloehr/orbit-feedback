@@ -127,11 +127,10 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
         }
     }
 
-     /* Increase verbosity if more than 3 Sparks are not performing ideally*/
-    if(is_everyone_off > 3){
+     /* Increase verbosity if more than 3 Sparks are not performing ideally or Zero-Packet occurs */
+    if(is_everyone_off > 3 || latest_zero_packet){
         print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
         print_debug_info("STATS: Counters %s\t (average %d)\n", statistics, avg_packet_cnt);
-        //print_debug_info("\t\t\t\t Spark 0? (Packet count [0] = %d, Average = %d)\n", spark_bookkeeper->count_per_libera[0], avg_packet_cnt);
     }
 
     /* Print latest zero packet at the end */
