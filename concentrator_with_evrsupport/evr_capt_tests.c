@@ -104,8 +104,8 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
     int threshold = avg_packet_cnt - 1;  /* Tolerate a difference of 1. We are working sequantially. */
     int is_everyone_off = 0, latest_zero_packet = 0;
 
-    char statistics[64] = "";
-    int pos;
+    char statistics[64];
+    int pos = 0;
 
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Save the counters into a string */
