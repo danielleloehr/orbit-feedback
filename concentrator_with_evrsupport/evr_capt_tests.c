@@ -121,12 +121,12 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
 
         /* Print latest zero packet continuously */
         if(latest_zero_packet){
-            print_debug_info("WARNING: Latest 0-packet in collection %d\n", latest_zero_packet);
+            print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
         }
     }
-    
+
     if(is_everyone_off > 3){
-        print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
+        print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
     }
 
 }
