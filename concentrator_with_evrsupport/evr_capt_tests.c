@@ -112,10 +112,10 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
         }
         /* Overperformed */
-        else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
-            print_debug_info("STATS: Spark %d sent %d more packets than average (= %d)\n", 
-                box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);    
-        }
+      //  else if(spark_bookkeeper->count_per_libera[box_ind] > avg_packet_cnt){
+      //      print_debug_info("STATS: Spark %d sent %d more packets than average (= %d)\n", 
+      //          box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);    
+      //  }
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
             print_debug_info("\nWARNING: No packets were received from Spark %d\n !!!", box_ind);
