@@ -375,7 +375,7 @@ int main(int argc, char *argv[]){
     /********************************************/
     print_debug_info("TEST: Adjusting the socket buffer\n");
 
-    int recvbuff;
+    int recvbuff = 0;
     socklen_t optlen;
     getsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &recvbuff, &optlen);
     print_debug_info("TEST: Current size (old) of receive buffer %d\n", recvbuff);
