@@ -99,14 +99,13 @@ void uio_read(){
 }
 
 /* Careful: queue must be global */
-void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
+void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server, latest_zero_packet){
     /* Debug: Check if anyone is underperforming */
     int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
     /* Tolerate a difference of 1. We are working sequantially,
         this is very much possible */
     int threshold = avg_packet_cnt - 1;
     int is_everyone_off = 0;
-    int latest_zero_packet = 0;
 
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
         /* Underperformed */
@@ -411,6 +410,9 @@ int main(int argc, char *argv[]){
     struct sockaddr_in client;
     client_addr_size = sizeof(client);
     int buf[PAYLOAD_FIELDS];
+
+    /* Set this here to insist on printing */
+    int latest_zero_packet = 0;
 
     /*******************************************************************************/
     /* MAIN */
