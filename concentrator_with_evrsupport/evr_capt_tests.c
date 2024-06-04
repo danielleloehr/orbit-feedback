@@ -106,7 +106,8 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     //print_debug_info("STATS: Average packet count %d\n", avg_packet_cnt);
     
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-        if(spark_bookkeeper->count_per_libera[box_ind] < avg_packet_cnt){
+        /* Tolerate a difference of 1 */
+        if(spark_bookkeeper->count_per_libera[box_ind] < avg_packet_cnt-1){
             print_debug_info("STATS: Spark %d sent %d fewer packets than average (= %d)\n", 
                 box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, avg_packet_cnt);
         }else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
