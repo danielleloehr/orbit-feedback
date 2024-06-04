@@ -116,7 +116,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
                 spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
         }
         if(is_everyone_off > 3){
-            print_debug_info("STATS Half of the boxes performed below average. Someone sent too many packets!!!\n");
+            print_debug_info("STATS: Half of the boxes performed below average. Someone sent too many packets!!!\n");
         }
         /* Done nothing */
         else if(spark_bookkeeper->count_per_libera[box_ind] == 0){
