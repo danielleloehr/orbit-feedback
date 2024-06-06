@@ -82,8 +82,9 @@ void panic(void){
         printf("\t[%d]=%d", i, ZERO_PACKET_COUNTER[i]);
         count_mishaps += ZERO_PACKET_COUNTER[i];
     }
+    printf("\n");
     printf("Total number of received Zero-Packets: %d\n", count_mishaps);
-    printf("Analysis of under-performance:\n");
+    printf("Analysis of under-performance per Spark (packet transmission below average):\n");
     for(int i = 0; i < NO_SPARKS; i++) {
         printf("\t[%d]=%d", i, PERFORMANCE[i]);
     }
