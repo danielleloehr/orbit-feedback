@@ -79,7 +79,7 @@ void panic(void){
     printf("Number of Zero-Packets received: %d \n", ZERO_PACKET_COUNTER);
     printf("Analysis of under-performance:\n");
     for(int i = 0; i < NO_SPARKS; i++) {
-        printf("\t[%d] ", PERFORMANCE[i]);
+        printf("\t[%d]=%d", i, PERFORMANCE[i]);
     }
     printf("\n");
     printf("---------------------------------------------------\n");
