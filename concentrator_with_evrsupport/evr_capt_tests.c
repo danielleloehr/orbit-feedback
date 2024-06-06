@@ -149,6 +149,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                 box_ind, GLOBAL_SEND_COUNTER);
             latest_zero_packet = GLOBAL_SEND_COUNTER;
+            ZERO_PACKET_COUNTER++;
             is_everyone_off++;
         }else 
             /* Underperformed */
