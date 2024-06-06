@@ -81,7 +81,7 @@ void panic(void){
     for(int i = 0; i < NO_SPARKS; i++) {
         printf("\t[%d] ", PERFORMANCE[i]);
     }
-    print("\n");
+    printf("\n");
     printf("---------------------------------------------------\n");
     exit(-1);
 }
