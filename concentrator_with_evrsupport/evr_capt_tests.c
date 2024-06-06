@@ -58,7 +58,7 @@ static int DEFAULT_DEBUG = 0;
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
-static long GLOBAL_SEND_COUNTER;
+static int GLOBAL_SEND_COUNTER;
 static int ZERO_PACKET_COUNTER;
 
 static int PERFORMANCE[NO_SPARKS];
@@ -77,9 +77,9 @@ void panic(void){
     printf("---------------------------------------------------\n");
     printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
     printf("Number of Zero-Packets received: %d \n", ZERO_PACKET_COUNTER);
-    printf("Analysis of under-performance per Spark:\n");
+    printf("Analysis of under-performance:\n");
     for(int i = 0; i < NO_SPARKS; i++) {
-        printf("\t[%d]", PERFORMANCE[i]);
+        printf("\t[%d] ", PERFORMANCE[i]);
     }
     print("\n");
     printf("---------------------------------------------------\n");
