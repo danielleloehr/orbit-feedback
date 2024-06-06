@@ -59,8 +59,8 @@ static int DEFAULT_DEBUG = 0;
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
-static int ZERO_PACKET_COUNTER;
 
+static int ZERO_PACKET_COUNTER[NO_SPARKS];
 static int PERFORMANCE[NO_SPARKS];
 
 /* Universal tick-tock structs for timing needs     */
@@ -76,7 +76,13 @@ void panic(void){
     printf(" Panic condition met... Here is how we did so far:\n");
     printf("---------------------------------------------------\n");
     printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
-    printf("Number of Zero-Packets received: %d \n", ZERO_PACKET_COUNTER);
+    printf("Analysis of Zero-Packet distribution per Spark:\n");
+    int count_mishaps = 0;
+    for(int i = 0; i < NO_SPARKS; i++) {
+        printf("\t[%d]=%d", i, ZERO_PACKET_COUNTER[i]);
+        count_mishaps += ZERO_PACKET_COUNTER[i];
+    }
+    printf("Total number of received Zero-Packets: %d\n", count_mishaps);
     printf("Analysis of under-performance:\n");
     for(int i = 0; i < NO_SPARKS; i++) {
         printf("\t[%d]=%d", i, PERFORMANCE[i]);
@@ -155,7 +161,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                 box_ind, GLOBAL_SEND_COUNTER);
             latest_zero_packet = GLOBAL_SEND_COUNTER;
-            ZERO_PACKET_COUNTER++;
+            ZERO_PACKET_COUNTER[box_ind]++;
             is_everyone_off++;
         }else 
             /* Underperformed */
@@ -386,7 +392,7 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
-    ZERO_PACKET_COUNTER = 0;
+    memset(ZERO_PACKET_COUNTER, 0 , sizeof(ZERO_PACKET_COUNTER));
     memset(PERFORMANCE, 0 , sizeof(PERFORMANCE));
 
     /* Display start configuration */
