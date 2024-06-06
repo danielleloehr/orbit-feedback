@@ -1,13 +1,16 @@
 /*
- fa-capture under test
-   VERSION 00.05.1  -- Richards version with mrfioc2 support
+ This code was not generated with ChatGPT. Please assume 
+ human-made errors.
+
+ FA capture for hybrid operation
+   VERSION 00.06.0 -- Richards version with mrfioc2 support
                  ____________________                   __________________
                 |                    |                 |                  |
  Spark 1..8 --->|  Concentrator CPU  |---compressed--->|   Remote Server  |
                 |      (Richard)     |      data       |  (dest IP/port)  | 
                 |____________________|                 |__________________|
 
-
+ Please disable debug features for normal operation!
 */
 
 #include "test_utils.h"		// keep this here GNU_SOURCE
@@ -31,10 +34,8 @@
 /******************************/
 
 /* Please adjust these parameters carefully */
-/* Queue size per Spark  */
-#define MAX_BUFF_SIZE 1000000       
-/* An estimated number of packets for averaging in the case of an overflow */
-#define EST_PACKET_COUNT 10000      
+#define MAX_BUFF_SIZE 1000000           /* Queue size per Spark  */ 
+#define EST_PACKET_COUNT 10000          /* An estimated number of packets for averaging in the case of an overflow */
 
 /* Global packet queue */
 static struct packetRecord queue[NO_SPARKS][MAX_BUFF_SIZE];       
@@ -58,13 +59,45 @@ static int DEFAULT_DEBUG = 0;
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
+static int ZERO_PACKET_COUNTER;
 
 /* Universal tick-tock structs for timing needs     */
-/* CAREFUL: 
-    tic is set by the "STOP" thread.    
-    toc is set after the inner while loop is broken */
-struct timespec tic, toc;       // not used right now
+struct timespec tic, toc; 
 
+/******************************/
+/* Debug: termination signal
+    Please disable for normal operation */
+static struct sigaction term_sigact;
+
+/* Panic here and print statistics at exit */
+void panic(void){
+    printf(" Panic condition met... Here is how we did so far:\n");
+    printf("---------------------------------------------------\n");
+    printf("Number of received packets from %d Spark boxes: %d\n", NO_SPARKS, GLOBAL_PACKET_COUNTER);
+    printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
+    printf("Number of Zero-Packets received: %d \n", ZERO_PACKET_COUNTER);
+    printf("---------------------------------------------------\n");
+    exit(-1);
+}
+
+/* Main signal handler, calls panic to print exit stats */
+static void term_handler(int sig){
+    if (sig == SIGINT) panic();
+}
+
+/* Initialise termination signal action */
+void init_term_signal(void){
+    term_sigact.sa_handler = term_handler;
+    sigemptyset(&term_sigact.sa_mask);
+    term_sigact.sa_flags = 0;
+    sigaction(SIGINT, &term_sigact, (struct sigaction *) NULL);
+}
+
+/* Housekeeping for sigaction, run upon exit */
+void cleanup_term(void){
+    sigemptyset(&term_sigact.sa_mask);
+}
+/**********************************************/
 #if SOFT_IRQ
     /* Artifial pacemaker to set the rate at which 
         compressed packets should be sent */
@@ -328,6 +361,10 @@ void parse_command_arguments(int argc, char *argv[]){
 
 int main(int argc, char *argv[]){   
 
+    /* Debug: termination signal */
+    atexit(cleanup_term);
+    init_term_signal();
+
     /********************************************/
     /* General configuration settings           */
     /********************************************/
@@ -341,6 +378,7 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
+    ZERO_PACKET_COUNTER = 0;
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
@@ -457,6 +495,8 @@ int main(int argc, char *argv[]){
             /* Record the packet */
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
             /* Increase global counter */
+            /* If you only want to count the packets from Sparks that are in the addressbook, 
+                increase this counter in the registration routine below instead. */
             GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF
@@ -473,12 +513,13 @@ int main(int argc, char *argv[]){
                 for(int i=0; i<NO_SPARKS; i++){
                     if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
                         spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
+                        // GLOBAL_PACKET_COUNTER++;
                         // Check the buffer limits                                 
                         if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
                             spark_bookkeeper.buffer_index[i]++;
                         }else {
-                            spark_bookkeeper.buffer_index[i] = 0;                         // go to beginning
+                            spark_bookkeeper.buffer_index[i] = 0;                         // Go to beginning
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;         // then register the packet
                         }
                     }
@@ -488,7 +529,7 @@ int main(int argc, char *argv[]){
         }else{
             perror("recvfrom()");
             if(errno == EINTR){
-                // IMPORTANT: Check if the zero-byte packets happen after this call!!!
+                /* In case a system interrupt call happens, ignore and continue */
                 print_debug_info("DEBUG: Interrupted system call\n");
                 continue;
             }else {
