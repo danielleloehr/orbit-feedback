@@ -75,7 +75,6 @@ static struct sigaction term_sigact;
 void panic(void){
     printf(" Panic condition met... Here is how we did so far:\n");
     printf("---------------------------------------------------\n");
-    printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
     printf("Analysis of Zero-Packet distribution per Spark:\n");
     int count_mishaps = 0;
     for(int i = 0; i < NO_SPARKS; i++) {
@@ -89,6 +88,7 @@ void panic(void){
         printf("\t[%d]=%d", i, PERFORMANCE[i]);
     }
     printf("\n");
+    printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
     printf("---------------------------------------------------\n");
     exit(-1);
 }
