@@ -58,8 +58,10 @@ static int DEFAULT_DEBUG = 0;
 
 /* Additional test variables */
 static int GLOBAL_PACKET_COUNTER;
-static int GLOBAL_SEND_COUNTER;
+static long GLOBAL_SEND_COUNTER;
 static int ZERO_PACKET_COUNTER;
+
+static int PERFORMANCE[NO_SPARKS];
 
 /* Universal tick-tock structs for timing needs     */
 struct timespec tic, toc; 
@@ -73,9 +75,13 @@ static struct sigaction term_sigact;
 void panic(void){
     printf(" Panic condition met... Here is how we did so far:\n");
     printf("---------------------------------------------------\n");
-    printf("Number of received packets from %d Spark boxes: %d\n", NO_SPARKS, GLOBAL_PACKET_COUNTER);
     printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
     printf("Number of Zero-Packets received: %d \n", ZERO_PACKET_COUNTER);
+    printf("Analysis of under-performance per Spark:\n");
+    for(int i = 0; i < NO_SPARKS; i++) {
+        printf("\t[%d]", PERFORMANCE[i]);
+    }
+    print("\n");
     printf("---------------------------------------------------\n");
     exit(-1);
 }
@@ -154,6 +160,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
         }else 
             /* Underperformed */
             if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
+                PERFORMANCE[box_ind]++;
                 is_everyone_off++;
                 print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
                     box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
@@ -380,6 +387,7 @@ int main(int argc, char *argv[]){
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
     ZERO_PACKET_COUNTER = 0;
+    memset(PERFORMANCE, 0 , sizeof(PERFORMANCE));
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
@@ -498,7 +506,7 @@ int main(int argc, char *argv[]){
             /* Increase global counter */
             /* If you only want to count the packets from Sparks that are in the addressbook, 
                 increase this counter in the registration routine below instead. */
-            GLOBAL_PACKET_COUNTER++;
+            //GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF
                 printf("%ld, %ld\n", packet.arrival.tv_sec, packet.arrival.tv_nsec); 
@@ -514,7 +522,7 @@ int main(int argc, char *argv[]){
                 for(int i=0; i<NO_SPARKS; i++){
                     if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
                         spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
-                        // GLOBAL_PACKET_COUNTER++;
+                        GLOBAL_PACKET_COUNTER++;
                         // Check the buffer limits                                 
                         if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
