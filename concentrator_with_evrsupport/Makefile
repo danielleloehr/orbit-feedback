@@ -1,6 +1,6 @@
 IDIR = ./include
 CC = gcc
-CFLAGS = -g -Wall -std=c11 -Wno-unused-variable
+CFLAGS = -Wall -std=c11 -Wno-unused-variable
 
 _DEPS = bpm.h sockets.h test_utils.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
