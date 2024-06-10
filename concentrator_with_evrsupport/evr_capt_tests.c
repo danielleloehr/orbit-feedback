@@ -61,7 +61,7 @@ static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
 
 static int ZERO_PACKET_COUNTER[NO_SPARKS];
-static long int PERFORMANCE[NO_SPARKS];
+static long PERFORMANCE[NO_SPARKS];
 
 /* Universal tick-tock structs for timing needs     */
 struct timespec tic, toc; 
