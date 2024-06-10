@@ -57,11 +57,12 @@ static char *DEFAULT_BPM_SELECTION = "mtca1c1s1s14g";
 static int DEFAULT_DEBUG = 0;
 
 /* Additional test variables */
+/* Check each for an overflow! */
 static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
 
-// static int ZERO_PACKET_COUNTER[NO_SPARKS];
-// static long PERFORMANCE[NO_SPARKS];
+static uint32_t ZERO_PACKET_COUNTER[NO_SPARKS];
+static uint32_t PERFORMANCE[NO_SPARKS];
 
 /* Universal tick-tock structs for timing needs     */
 struct timespec tic, toc; 
@@ -72,44 +73,44 @@ struct timespec tic, toc;
 static struct sigaction term_sigact;
 
 /* Panic here and print statistics at exit */
-// void panic(void){
-//     printf(" Panic condition met... Here is how we did so far:\n");
-//     printf("---------------------------------------------------\n");
-//     printf("Analysis of Zero-Packet distribution per Spark:\n");
-//     int count_mishaps = 0;
-//     for(int i = 0; i < NO_SPARKS; i++) {
-//         printf("\t[%d]=%d", i, ZERO_PACKET_COUNTER[i]);
-//         count_mishaps += ZERO_PACKET_COUNTER[i];
-//     }
-//     printf("\n");
-//     printf("Total number of received Zero-Packets: %d\n", count_mishaps);
-//     printf("Analysis of under-performance per Spark (packet transmission below average):\n");
-//     for(int i = 0; i < NO_SPARKS; i++) {
-//         printf("\t[%d]=%ld", i, PERFORMANCE[i]);
-//     }
-//     printf("\n");
-//     printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
-//     printf("---------------------------------------------------\n");
-//     exit(-1);
-// }
+void panic(void){
+    printf(" Panic condition met... Here is how we did so far:\n");
+    printf("---------------------------------------------------\n");
+    printf("Analysis of Zero-Packet distribution per Spark:\n");
+    int count_mishaps = 0;
+    for(int i = 0; i < NO_SPARKS; i++) {
+        printf("\t[%d]=%u", i, ZERO_PACKET_COUNTER[i]);
+        count_mishaps += ZERO_PACKET_COUNTER[i];
+    }
+    printf("\n");
+    printf("Total number of received Zero-Packets: %d\n", count_mishaps);
+    printf("Analysis of under-performance per Spark (packet transmission below average):\n");
+    for(int i = 0; i < NO_SPARKS; i++) {
+        printf("\t[%d]=%u", i, PERFORMANCE[i]);
+    }
+    printf("\n");
+    printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
+    printf("---------------------------------------------------\n");
+    exit(-1);
+}
 
 /* Main signal handler, calls panic to print exit stats */
-// static void term_handler(int sig){
-//     if (sig == SIGINT) panic();
-// }
+static void term_handler(int sig){
+    if (sig == SIGINT) panic();
+}
 
 /* Initialise termination signal action */
-// void init_term_signal(void){
-//     term_sigact.sa_handler = term_handler;
-//     sigemptyset(&term_sigact.sa_mask);
-//     term_sigact.sa_flags = 0;
-//     sigaction(SIGINT, &term_sigact, (struct sigaction *) NULL);
-// }
+void init_term_signal(void){
+    term_sigact.sa_handler = term_handler;
+    sigemptyset(&term_sigact.sa_mask);
+    term_sigact.sa_flags = 0;
+    sigaction(SIGINT, &term_sigact, (struct sigaction *) NULL);
+}
 
 /* Housekeeping for sigaction, run upon exit */
-// void cleanup_term(void){
-//     sigemptyset(&term_sigact.sa_mask);
-// }
+void cleanup_term(void){
+    sigemptyset(&term_sigact.sa_mask);
+}
 
 /**********************************************/
 #if SOFT_IRQ
@@ -146,49 +147,62 @@ void uio_read(){
 }
 
 /* Debug: Check if anyone is underperforming */
-// void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
-//     int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
-//     int threshold = avg_packet_cnt - 1;  /* Tolerate a difference of 1. We are working sequantially. */
-//     int is_everyone_off = 0, latest_zero_packet = 0;
+void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
+    int avg_packet_cnt = (int) GLOBAL_PACKET_COUNTER / NO_SPARKS;
+    int threshold = avg_packet_cnt - 1;  /* Tolerate a difference of 1. We are working sequantially. */
+    int is_everyone_off = 0, latest_zero_packet = 0;
 
-//     char statistics[128];
-//     int pos = 0;
+    char statistics[128];
+    int pos = 0;
 
-//     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
-//         /* Save the counters into a string */
-//         pos += sprintf(&statistics[pos], "\t[%d]=%d", box_ind, spark_bookkeeper->count_per_libera[box_ind]);
+    /* Continue only if average packet rate is greater than zero */
+    if (avg_packet_cnt != 0){
+        for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
+        /* Save the counters into a string */
+            pos += sprintf(&statistics[pos], "\t[%d]=%d", box_ind, spark_bookkeeper->count_per_libera[box_ind]);
 
-//          /* Done nothing */
-//         if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-//             print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
-//                 box_ind, GLOBAL_SEND_COUNTER);
-//             latest_zero_packet = GLOBAL_SEND_COUNTER;
-//             ZERO_PACKET_COUNTER[box_ind]++;
-//             is_everyone_off++;
-//         }else 
-//             /* Underperformed */
-//             if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
-//                 PERFORMANCE[box_ind]++;
-//                 is_everyone_off++;
-//                 print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
-//                     box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
-//                     spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
-//         }
-//     }
+            /* Done nothing */
+            if(spark_bookkeeper->count_per_libera[box_ind] == 0){
+                print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
+                    box_ind, GLOBAL_SEND_COUNTER);
+                latest_zero_packet = GLOBAL_SEND_COUNTER;
+                ZERO_PACKET_COUNTER[box_ind]++;
+                is_everyone_off++;
+            }else 
+                /* Underperformed */
+                if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
+                    /* Check for an overflow */
+                    if(PERFORMANCE[box_ind] == UINT32_MAX-1){
+                        print_debug_info("WARNING: Cleaning performance counter for Spark %d!", box_ind);
+                        PERFORMANCE[box_ind] = 0;
+                    }else{
+                        PERFORMANCE[box_ind]++;
+                    }
+                    
+                    is_everyone_off++;
+                    print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
+                        box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
+                        spark_bookkeeper->count_per_libera[box_ind] ,avg_packet_cnt, GLOBAL_SEND_COUNTER);
+                }
+        }
 
-//      /* Increase verbosity if more than 3 Sparks are not performing ideally or Zero-Packet occurs */
-//     if(is_everyone_off > 3 || latest_zero_packet){
-//         print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
-//         print_debug_info("STATS: Counters %s\t (average %d)\n", statistics, avg_packet_cnt);
-//     }
+        /* Increase verbosity if more than 3 Sparks are not performing ideally or Zero-Packet occurs */
+        if(is_everyone_off > 3 || latest_zero_packet){
+            print_debug_info("STATS: More than 3 boxes performed below average. Someone might have sent too many packets!!!\n");
+            print_debug_info("STATS: Counters %s\t (average %d)\n", statistics, avg_packet_cnt);
+        }
 
-//     /* Print latest zero packet at the end */
-//     if(latest_zero_packet){
-//         print_debug_info("---------------------------------------------------\n");
-//         print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
-//         print_debug_info("---------------------------------------------------\n");
-//     }  
-// }
+        /* Print latest zero packet at the end */
+        if(latest_zero_packet){
+            print_debug_info("---------------------------------------------------\n");
+            print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
+            print_debug_info("---------------------------------------------------\n");
+        }  
+    }else{
+        print_debug_info("WARNING: Calculation of statistics is not possible right now! (average packet rate is 0)");
+    }
+
+}
 
 /* Careful: queue must be global */
 void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, struct sockaddr_in transmit_server){
@@ -378,8 +392,8 @@ void parse_command_arguments(int argc, char *argv[]){
 int main(int argc, char *argv[]){   
 
     /* Debug: termination signal */
-    // atexit(cleanup_term);
-    // init_term_signal();
+    atexit(cleanup_term);
+    init_term_signal();
 
     /********************************************/
     /* General configuration settings           */
@@ -394,8 +408,8 @@ int main(int argc, char *argv[]){
     /********************************************/
     GLOBAL_PACKET_COUNTER = 0;
     GLOBAL_SEND_COUNTER = 0;
-    // memset(ZERO_PACKET_COUNTER, 0 , sizeof(ZERO_PACKET_COUNTER));
-    // memset(PERFORMANCE, 0 , sizeof(PERFORMANCE));
+    memset(ZERO_PACKET_COUNTER, 0 , sizeof(ZERO_PACKET_COUNTER));
+    memset(PERFORMANCE, 0 , sizeof(PERFORMANCE));
 
     /* Display start configuration */
     parse_command_arguments(argc, argv);  
@@ -503,7 +517,7 @@ int main(int argc, char *argv[]){
     while(1){
         if(send_data){
             /* Debug: print statistics */
-            // get_packet_statistics(&spark_bookkeeper);      
+            get_packet_statistics(&spark_bookkeeper);      
             compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server);
             GLOBAL_PACKET_COUNTER = 0;
             send_data = 0;
@@ -543,6 +557,13 @@ int main(int argc, char *argv[]){
                     }
                 }
             #endif   
+
+            /* Check if Global Packet Counter expired 
+                This can happen if the interrupt signal disappears for a long time */
+            if(GLOBAL_PACKET_COUNTER == MAX_BUFF_SIZE){
+                print_debug_info("WARNING: Max. buffer size reached. Cleaning GLOBAL_PACKET_COUNTER"); 
+                GLOBAL_PACKET_COUNTER = 0;
+            }
  
         }else{
             perror("recvfrom()");
