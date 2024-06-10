@@ -513,7 +513,7 @@ int main(int argc, char *argv[]){
             /* Increase global counter */
             /* If you only want to count the packets from Sparks that are in the addressbook, 
                 increase this counter in the registration routine below instead. */
-            //GLOBAL_PACKET_COUNTER++;
+            GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF
                 printf("%ld, %ld\n", packet.arrival.tv_sec, packet.arrival.tv_nsec); 
@@ -529,7 +529,7 @@ int main(int argc, char *argv[]){
                 for(int i=0; i<NO_SPARKS; i++){
                     if(packet.id == spark_bookkeeper.box_id[i]){             // Get the box ID                   
                         spark_bookkeeper.count_per_libera[i]++;              // Put the packet in the corresponding queue
-                        GLOBAL_PACKET_COUNTER++;
+                        //GLOBAL_PACKET_COUNTER++;
                         // Check the buffer limits                                 
                         if (spark_bookkeeper.buffer_index[i] < MAX_BUFF_SIZE-1){
                             queue[i][spark_bookkeeper.buffer_index[i]] = packet ;
