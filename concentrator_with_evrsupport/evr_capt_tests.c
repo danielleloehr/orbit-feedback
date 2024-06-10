@@ -61,7 +61,7 @@ static int GLOBAL_PACKET_COUNTER;
 static int GLOBAL_SEND_COUNTER;
 
 static int ZERO_PACKET_COUNTER[NO_SPARKS];
-static int PERFORMANCE[NO_SPARKS];
+static long int PERFORMANCE[NO_SPARKS];
 
 /* Universal tick-tock structs for timing needs     */
 struct timespec tic, toc; 
@@ -85,7 +85,7 @@ void panic(void){
     printf("Total number of received Zero-Packets: %d\n", count_mishaps);
     printf("Analysis of under-performance per Spark (packet transmission below average):\n");
     for(int i = 0; i < NO_SPARKS; i++) {
-        printf("\t[%d]=%d", i, PERFORMANCE[i]);
+        printf("\t[%d]=%ld", i, PERFORMANCE[i]);
     }
     printf("\n");
     printf("Number of compressed packets sent by us as of now: %d (ignore time-out)\n", GLOBAL_SEND_COUNTER);
@@ -150,7 +150,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
     int threshold = avg_packet_cnt - 1;  /* Tolerate a difference of 1. We are working sequantially. */
     int is_everyone_off = 0, latest_zero_packet = 0;
 
-    char statistics[64];
+    char statistics[128];
     int pos = 0;
 
     for(int box_ind = 0; box_ind < NO_SPARKS; box_ind++){
