@@ -269,7 +269,10 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
     /* Send all compressed X[0,1,2,3,4,5,6] and Y[7,8,9,10,11,12,13] values */
     sendto(trans_sock, arrayXY_all, sizeof(arrayXY_all), 0, (struct sockaddr *)&transmit_server, sizeof(transmit_server));
 
+    /* Exit */
     GLOBAL_SEND_COUNTER++;  
+    GLOBAL_PACKET_COUNTER = 0;
+    send_data = 0;
     // tic 
     clock_gettime(CLOCK_MONOTONIC, &tic); 
 }
@@ -503,8 +506,6 @@ int main(int argc, char *argv[]){
         if(send_data){
             get_packet_statistics(&spark_bookkeeper);      // print statistics first for debugging
             compress_and_send(&spark_bookkeeper, sock_concentrated, transmit_server);
-            send_data = 0;
-            GLOBAL_PACKET_COUNTER = 0;
         }  
 
         if(recvfrom(sock_collection, buf, sizeof(buf), 0, (struct sockaddr *) &client, (socklen_t *) &client_addr_size) >= 0){
