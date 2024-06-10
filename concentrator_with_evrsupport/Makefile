@@ -1,6 +1,6 @@
 IDIR = ./include
 CC = gcc
-CFLAGS = -Wall -std=c11 -Wno-unused-variable
+CFLAGS = -g -Wall -std=c11 -Wno-unused-variable
 
 _DEPS = bpm.h sockets.h test_utils.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
@@ -28,7 +28,7 @@ evr_capt_tests.o: evr_capt_tests.c $(DEPS)
 
 # Build irq-capture and do housekeeping
 $(TARGET): $(OBJ) $(DEPS)
-	$(CC) $(CFLAGS) -o $@ $^  -lpthread
+	$(CC) $(CFLAGS) -o $@ $^ -lpthread
 	rm -f *~ $(IDIR)/*.gch
 
 .PHONY: clean
