@@ -173,12 +173,12 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
                 if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
                     /* Check for an overflow */
                     if(PERFORMANCE[box_ind] == UINT32_MAX-1){
-                        print_debug_info("WARNING: Cleaning performance counter for Spark %d!", box_ind);
+                        print_debug_info("WARNING: Cleaning performance counter for Spark %d!\n", box_ind);
                         PERFORMANCE[box_ind] = 0;
                     }else{
                         PERFORMANCE[box_ind]++;
                     }
-                    
+
                     is_everyone_off++;
                     print_debug_info("STATS: Spark %d sent %d fewer packets than average \t( %d < %d). Collection no. %d\n", 
                         box_ind, spark_bookkeeper->count_per_libera[box_ind]-avg_packet_cnt, 
@@ -199,7 +199,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
             print_debug_info("---------------------------------------------------\n");
         }  
     }else{
-        print_debug_info("WARNING: Calculation of statistics is not possible right now! (average packet rate is 0)");
+        print_debug_info("WARNING: Calculation of statistics is not possible right now! (average packet rate is 0)\n");
     }
 
 }
@@ -561,7 +561,7 @@ int main(int argc, char *argv[]){
             /* Check if Global Packet Counter expired 
                 This can happen if the interrupt signal disappears for a long time */
             if(GLOBAL_PACKET_COUNTER == MAX_BUFF_SIZE){
-                print_debug_info("WARNING: Max. buffer size reached. Cleaning GLOBAL_PACKET_COUNTER"); 
+                print_debug_info("WARNING: Max. buffer size reached. Cleaning GLOBAL_PACKET_COUNTER \n"); 
                 GLOBAL_PACKET_COUNTER = 0;
             }
  
