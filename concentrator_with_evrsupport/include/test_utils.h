@@ -23,10 +23,15 @@
 #include <errno.h> 
 
 #define TIME_LIMIT_USEC 100     /* Stopwatch */
-#define DEBUG_ON        1
+#define DEBUG_ON      1
+#define WARNING_ON    1
 
 #if DEBUG_ON
     #define print_debug_info(format, ...)  fprintf (stderr, format, ##__VA_ARGS__)
+#endif
+
+#if WARNING_ON
+    #define print_warning_info(format, ...)  fprintf (stderr, format, ##__VA_ARGS__)
 #endif
 
 /* Print out formatting  */

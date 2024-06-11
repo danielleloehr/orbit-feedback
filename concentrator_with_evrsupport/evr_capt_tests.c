@@ -30,7 +30,7 @@
 #define ALARM_USEC       	6666.66
 
 #define TESTMODE            0
-/* DEBUG_ON can be toogled in test_utils */
+/* DEBUG_ON and WARNING_ON can be toogled in test_utils */
 /******************************/
 
 /* Please adjust these parameters carefully */
@@ -164,12 +164,12 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
 
             /* Done nothing */
             if(spark_bookkeeper->count_per_libera[box_ind] == 0){
-                print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
+                print_warning_info("WARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                     box_ind, GLOBAL_SEND_COUNTER);
                 latest_zero_packet = GLOBAL_SEND_COUNTER;
                     /* It should not come to this point! Majority must be disconnected to end up here. */
                     if(ZERO_PACKET_COUNTER[box_ind] == UINT32_MAX-1){
-                        print_debug_info("WARNING: Cleaning zero-packet counter for Spark %d!\n", box_ind);
+                        print_warning_info("WARNING: Cleaning zero-packet counter for Spark %d!\n", box_ind);
                         ZERO_PACKET_COUNTER[box_ind] = 0;
                     }else{
                         ZERO_PACKET_COUNTER[box_ind]++;
@@ -180,7 +180,7 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
                 if(spark_bookkeeper->count_per_libera[box_ind] < threshold){ 
                     /* Check for an overflow */
                     if(PERFORMANCE[box_ind] == UINT32_MAX-1){
-                        print_debug_info("WARNING: Cleaning performance counter for Spark %d!\n", box_ind);
+                        print_warning_info("WARNING: Cleaning performance counter for Spark %d!\n", box_ind);
                         PERFORMANCE[box_ind] = 0;
                     }else{
                         PERFORMANCE[box_ind]++;
@@ -201,12 +201,12 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
 
         /* Print latest zero packet at the end */
         if(latest_zero_packet){
-            print_debug_info("---------------------------------------------------\n");
-            print_debug_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
-            print_debug_info("---------------------------------------------------\n");
+            print_warning_info("---------------------------------------------------\n");
+            print_warning_info("WARNING: Latest Zero-Packet in collection %d\n", latest_zero_packet);
+            print_warning_info("---------------------------------------------------\n");
         }  
     }else{
-        print_debug_info("WARNING: Calculation of statistics is not possible right now! (average packet rate is 0)\n");
+        print_warning_info("WARNING: Calculation of statistics is not possible right now! (average packet rate is 0)\n");
     }
 
 }
@@ -238,7 +238,7 @@ void compress_and_send(struct bookKeeper *spark_bookkeeper, int trans_sock, stru
         /* Overwrite the count value if there was an overflow to average over only the latest packets in the full queue */
         int buffer_overflow = spark_bookkeeper->count_per_libera[i] - MAX_BUFF_SIZE;    
         if(buffer_overflow >= 0 ){
-            print_debug_info("WARNING: Buffer overflow (or edge condition) is reported.\n");
+            print_warning_info("WARNING: Buffer overflow (or edge condition) is reported.\n");
             if(!(buffer_overflow % MAX_BUFF_SIZE)){
                 print_debug_info("DEBUG: Edge Cond. Averaging over MAX_BUFF_SIZE (=%d)\n", MAX_BUFF_SIZE);
                 spark_bookkeeper->count_per_libera[i] = MAX_BUFF_SIZE;
@@ -568,7 +568,7 @@ int main(int argc, char *argv[]){
             /* Check if Global Packet Counter expired 
                 This can happen if the interrupt signal disappears for a long time */
             if(GLOBAL_PACKET_COUNTER == MAX_BUFF_SIZE){
-                print_debug_info("WARNING: Max. buffer size reached. Cleaning GLOBAL_PACKET_COUNTER \n"); 
+                print_warning_info("WARNING: Max. buffer size reached. Cleaning GLOBAL_PACKET_COUNTER \n"); 
                 GLOBAL_PACKET_COUNTER = 0;
             }
  
