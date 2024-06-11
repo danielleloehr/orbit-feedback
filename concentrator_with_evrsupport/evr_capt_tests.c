@@ -166,7 +166,13 @@ void get_packet_statistics(struct bookKeeper *spark_bookkeeper){
                 print_debug_info("\nWARNING: No packets were received from Spark %d !!! Collection no. %d\n", 
                     box_ind, GLOBAL_SEND_COUNTER);
                 latest_zero_packet = GLOBAL_SEND_COUNTER;
-                ZERO_PACKET_COUNTER[box_ind]++;
+                    /* It should not come to this point! Majority must be disconnected to end up here. */
+                    if(ZERO_PACKET_COUNTER[box_ind] == UINT32_MAX-1){
+                        print_debug_info("WARNING: Cleaning zero-packet counter for Spark %d!\n", box_ind);
+                        ZERO_PACKET_COUNTER[box_ind] = 0;
+                    }else{
+                        ZERO_PACKET_COUNTER[box_ind]++;
+                    }
                 is_everyone_off++;
             }else 
                 /* Underperformed */
