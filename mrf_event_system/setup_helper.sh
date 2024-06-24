@@ -1,3 +1,4 @@
+#!/bin/bash
 ##
 ## Startup script helper to run st.cmd from current directory
 ## Select device: EVR / EVM or both
@@ -8,7 +9,7 @@ setup_device(){
     CURR_PATH=`pwd`
     # EPICS mrfioc2 path
     # Please edit this accordingly!!!
-    MRFIOC2_PATH=~/EPICS/modules/mrfioc2/
+    MRFIOC2_PATH=~/epics/modules/mrfioc2/
 
     cd $MRFIOC2_PATH
     echo -e "mrfioc2 path is $MRFIOC2_PATH"

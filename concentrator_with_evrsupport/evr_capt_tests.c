@@ -460,8 +460,8 @@ int main(int argc, char *argv[]){
     }
     /********************************************/
     /* Adjust receive buffer                    */
-    /* CAREFUL: this requires net.core.rmem_max */
-    /*  tuning (set to 16777216)                */
+    /* CAREFUL: this requires tuning of         */
+    /*    net.core.rmem_max                     */
     /********************************************/
     print_debug_info("TEST: Adjusting the socket buffer\n");
 
@@ -471,7 +471,7 @@ int main(int argc, char *argv[]){
     print_debug_info("TEST: Current size (old) of receive buffer %d\n", recvbuff);
 
     /* CAREFUL: This value will be doubled. Make sure rmem_max is at least 2x(extenbuff) */
-    int extendbuff = 8388608;       // Don't use long extend_buffer = 16777216; 
+    int extendbuff = 8388608;       // Don't use long extend_buffer = 16777216; All is fine without.
 	setsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &extendbuff, sizeof(extendbuff)); 
     getsockopt(sock_collection, SOL_SOCKET, SO_RCVBUF, &recvbuff, &optlen);
     print_debug_info("TEST: Current size (new) of receive buffer %d\n", recvbuff);
@@ -511,6 +511,7 @@ int main(int argc, char *argv[]){
     /* Interrupt handling                       */
     /********************************************/ 
     pthread_t irq_thread_id;
+
     #if(EVR_IRQ)
         print_debug_info("DEBUG: Reporting interrupt requests from EVR...\n");
         pthread_create(&irq_thread_id, NULL, (void *) uio_read, NULL);
@@ -535,7 +536,8 @@ int main(int argc, char *argv[]){
             clock_gettime(CLOCK_MONOTONIC, &packet.arrival); 
             /* Increase global counter */
             /* If you only want to count the packets from Sparks that are in the addressbook, 
-                increase this counter in the registration routine below instead. */
+                increase this counter in the registration routine below instead. Otherwise, 
+                this sums ALL packets received. */
             GLOBAL_PACKET_COUNTER++;
 
             #if LATENCY_PERF

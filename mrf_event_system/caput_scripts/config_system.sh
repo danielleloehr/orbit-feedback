@@ -1,3 +1,4 @@
+#!/bin/bash
 ##
 ## Run this script to configure the event system and trigger events. This script 
 ## will configure one EVM and one EVR at a time. To configure a second EVR, you
